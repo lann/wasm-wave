@@ -1,0 +1,14 @@
+[package]
+name = "wasm-wave"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+thiserror = "1.0.48"
+wasmtime = { workspace = true }
+
+[dev-dependencies]
+wasmtime = { workspace = true, features = ["cranelift"] }
+
+[workspace.dependencies]
+wasmtime = { git = "https://github.com/bytecodealliance/wasmtime", branch = "release-13.0.0", default-features = false, features = ["component-model"] }
