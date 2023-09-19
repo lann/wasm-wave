@@ -162,10 +162,10 @@ impl<W: Write> Writer<W> {
     fn write_char(&mut self, ch: char) -> Result<(), Error> {
         if "\\\"\'\t\r\n".contains(ch) {
             write!(self.inner, "{}", ch.escape_default())?;
-        } else if ch.is_ascii_control() {
-            write!(self.inner, "\\x{:02x}", ch as u8)?;
+        } else if ch.is_control() {
+            write!(self.inner, "{}", ch.escape_unicode())?;
         } else {
-            write!(self.inner, "{ch}")?;
+            write!(self.inner, "{}", ch.escape_debug())?;
         }
         Ok(())
     }

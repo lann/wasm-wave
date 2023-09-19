@@ -390,14 +390,36 @@ impl<'a> Parser<'a> {
             'n' => Ok(('\n', 2, true)),
             'r' => Ok(('\r', 2, true)),
             't' => Ok(('\t', 2, true)),
-            'x' => {
-                let mut nibbles = chars.map(|ch| ch.to_digit(16));
-                let (Some(Some(h)), Some(Some(l))) = (nibbles.next(), nibbles.next()) else {
+            'u' => {
+                if chars.next() != Some('{') {
                     return Err(Error::InvalidEscape(
-                        span_str.chars().skip(1).take(3).collect(),
+                        span_str.chars().skip(1).take(2).collect(),
                     ));
-                };
-                Ok(((h << 4 | l).try_into().unwrap(), 4, true))
+                }
+                let mut nibbles = chars.clone().map(|ch| ch.to_digit(16));
+                let mut num_nibbles = 0;
+                let mut value: u32 = 0;
+                while let Some(Some(nibble)) = nibbles.next() {
+                    num_nibbles += 1;
+                    value <<= 4;
+                    value |= nibble;
+                    if value > 0x10FFFF {
+                        return Err(Error::InvalidEscape(
+                            span_str.chars().skip(1).take(2 + num_nibbles + 1).collect(),
+                        ));
+                    }
+                }
+                if chars.skip(num_nibbles).next() != Some('}') {
+                    return Err(Error::InvalidEscape(
+                        span_str.chars().skip(1).take(2 + num_nibbles + 1).collect(),
+                    ));
+                }
+                match value.try_into() {
+                    Ok(ch) => Ok((ch, 3 + num_nibbles + 1, true)),
+                    Err(_) => Err(Error::InvalidEscape(
+                        span_str.chars().skip(1).take(2 + num_nibbles + 1).collect(),
+                    )),
+                }
             }
             other => Err(Error::InvalidEscape(other.to_string())),
         }
@@ -491,12 +513,13 @@ mod tests {
             (r"'\\'", Val::Char('\\')),
             (r"'\''", Val::Char('\'')),
             (r"'\n'", Val::Char('\n')),
-            (r"'\x00'", Val::Char('\0')),
-            (r"'\x1b'", Val::Char('\x1b')),
-            (r"'\x7F'", Val::Char('\x7f')),
+            (r"'\u{0}'", Val::Char('\0')),
+            (r"'\u{1b}'", Val::Char('\x1b')),
+            (r"'\u{7F}'", Val::Char('\x7f')),
+            (r"'\u{10ffff}'", Val::Char('\u{10ffff}')),
             (r#""abc""#, Val::String("abc".into())),
             (r#""☃\\\"\n""#, Val::String("☃\\\"\n".into())),
-            (r#""\x00\x7f""#, Val::String("\x00\x7F".into())),
+            (r#""\u{0}\u{7f}""#, Val::String("\x00\x7F".into())),
         ] {
             assert_eq!(parse_unwrap::<Val>(input, want.ty()), want);
         }

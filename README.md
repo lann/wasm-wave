@@ -5,7 +5,7 @@
 |Bools|`true`, `false`
 |Integers|`123`, `-9`
 |Floats|`3.14`, `6.022e+23`, `nan`, `-inf`
-|Chars|`'x'`, `'☃︎'`, `'\''`, `'\x00'`
+|Chars|`'x'`, `'☃︎'`, `'\''`, `'\u{0}'`
 |Strings|`"abc\t123"`
 |Tuples|`("abc", 123)`
 |Lists|`[1, 2, 3]`
@@ -58,18 +58,16 @@ Floats are encoded as JSON numbers or one of the keywords `nan`, `inf`, or `-inf
 Chars are encoded as `'<char>'`, where `<char>` is one of:
 
 - a single [Unicode Scalar Value](https://unicode.org/glossary/#unicode_scalar_value)
-- one of these ASCII escapes:
+- one of these escapes:
   - `\'` → `'`
   - `\"` → `"`
   - `\\` → `\`
-  - `\t` → 0x09 (HT)
-  - `\n` → 0x0A (LF)
-  - `\r` → 0x0D (CR)
-  - `\x??` → 0x?? (where `??` is hex <= 0x7f)
+  - `\t` → U+9 (HT)
+  - `\n` → U+A (LF)
+  - `\r` → U+D (CR)
+  - `\u{···}` → U+··· (where `···` is hex Unicode Scalar Value)
 
 Escaping `\` and `'` is mandatory for chars.
-
-> TBD: Unicode escape? `\u{xxxxx}`
 
 ### Strings
 

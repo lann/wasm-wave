@@ -280,11 +280,12 @@ mod tests {
             (Val::Char('x'), "'x'"),
             (Val::Char('☃'), "'☃'"),
             (Val::Char('\''), r"'\''"),
-            (Val::Char('\0'), r"'\x00'"),
-            (Val::Char('\x1b'), r"'\x1b'"),
+            (Val::Char('\0'), r"'\u{0}'"),
+            (Val::Char('\x1b'), r"'\u{1b}'"),
+            (Val::Char('😂'), r"'😂'"),
             (Val::String("abc".into()), r#""abc""#),
             (Val::String(r#"\☃""#.into()), r#""\\☃\"""#),
-            (Val::String("\t\r\n\0".into()), r#""\t\r\n\x00""#),
+            (Val::String("\t\r\n\0".into()), r#""\t\r\n\u{0}""#),
         ] {
             let got = crate::to_string(&val)
                 .unwrap_or_else(|err| panic!("failed to serialize {val:?}: {err}"));
