@@ -1,5 +1,8 @@
 # WAVE: Web Assembly Value Encoding
 
+WAVE is a human-oriented text encoding of WebAssembly Component Model values. It is based largely on the
+[WIT IDL format](https://github.com/WebAssembly/component-model/blob/673d5c43c3cc0f4aeb8996a5c0931af623f16808/design/mvp/WIT.md).
+
 |Type|Example Values
 |---|---
 |Bools|`true`, `false`

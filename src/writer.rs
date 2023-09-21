@@ -1,3 +1,5 @@
+//! WAVE encoder.
+
 use std::{borrow::Borrow, fmt::Debug, io::Write};
 
 use thiserror::Error;
@@ -7,15 +9,18 @@ use crate::{
     val::Val,
 };
 
+/// A WAVE writer (encoder).
 pub struct Writer<W> {
     inner: W,
 }
 
 impl<W: Write> Writer<W> {
+    /// Returns a new Writer for the given [`std::io::Write`].
     pub fn new(w: W) -> Self {
         Self { inner: w }
     }
 
+    /// WAVE-encodes and writes the given [`Val`] to the underlying writer.
     pub fn write_value<V>(&mut self, val: &V) -> Result<(), Error>
     where
         V: Val,
@@ -143,9 +148,7 @@ impl<W: Write> Writer<W> {
                 self.write_str("}")?;
                 Ok(())
             }
-            crate::ty::Kind::Unsupported => {
-                Err(Error::Other(format!("unsupported value type {ty:?}")))
-            }
+            crate::ty::Kind::Unsupported => panic!("unsupported value type {ty:?}"),
         }
     }
 
@@ -171,11 +174,11 @@ impl<W: Write> Writer<W> {
     }
 }
 
+/// A Writer error.
 #[derive(Debug, Error)]
+#[non_exhaustive]
 pub enum Error {
+    /// An error from the underlying writer
     #[error("write failed: {0}")]
     Io(#[from] std::io::Error),
-
-    #[error("{0}")]
-    Other(String),
 }

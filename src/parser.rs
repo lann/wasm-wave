@@ -1,3 +1,5 @@
+//! WAVE parser.
+
 use std::{
     borrow::Cow,
     collections::HashMap,
@@ -13,12 +15,14 @@ use crate::{
     Type, Val,
 };
 
+/// A WAVE parser.
 pub struct Parser<'a> {
     tokens: Tokenizer<'a>,
     peeked: Option<(Token, Span)>,
 }
 
 impl<'a> Parser<'a> {
+    /// Returns a new Parser for the given input.
     pub fn new(input: &'a str) -> Self {
         Self {
             tokens: Tokenizer::new(input),
@@ -26,6 +30,8 @@ impl<'a> Parser<'a> {
         }
     }
 
+    /// Parses a WAVE-encoded value of the given [`Type`] into a corresponding
+    /// [`Val`].
     pub fn parse_value<V: Val>(&mut self, ty: &V::Type) -> Result<V, Error> {
         Ok(match ty.kind() {
             Kind::Bool => V::make_bool(self.parse_bool()?),
@@ -437,35 +443,56 @@ impl<'a> Parser<'a> {
     }
 }
 
+/// A WAVE Parser error.
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
+    /// Invalid char encoding
     #[error("invalid char: {0}")]
     InvalidChar(&'static str),
+    /// Invalid char or string escape
     #[error("invalid escape: `\\{0}`")]
     InvalidEscape(String),
+    /// Invalid `option` or `result` flattening
     #[error("cannot flatten nested {0:?}s")]
     InvalidFlattening(Kind),
+    /// Lexing (tokenizing) error
     #[error("invalid token: {0}")]
     Lex(#[from] crate::lex::Error),
+    /// Error returned by a [`Val`]`::make_*` method
     #[error("error constructing value: {0}")]
     MakeValueError(String),
+    /// Invalid integer encoding
     #[error("error parsing int: {0}")]
     ParseInt(#[from] ParseIntError),
+    /// Invalid float encoding
     #[error("error parsing float: {0}")]
     ParseFloat(#[from] ParseFloatError),
+    /// Duplicate record field
     #[error("duplicate field `{0}`")]
     RecordFieldDuplicated(String),
+    /// Missing record field
     #[error("missing field `{0}`")]
     RecordFieldMissing(String),
+    /// Unknown (undefined) record field
     #[error("unknown field `{0}`")]
     RecordFieldUnknown(String),
+    /// Unexpected name token
     #[error("expected {expected:?}, got {got:?}")]
-    UnexpectedName { expected: Vec<String>, got: String },
+    UnexpectedName {
+        /// Expected name(s)
+        expected: Vec<String>,
+        /// Got name
+        got: String,
+    },
+    /// Unexpected token type
     #[error("expected {expected:?}, got {got:?}")]
     UnexpectedToken {
+        /// Expected token type(s)
         expected: Vec<Token>,
+        /// Got token type
         got: Option<Token>,
     },
+    /// Unsupported type (e.g. for a particular [`Val`] impl)
     #[error("unsupported type {0}")]
     Unsupported(String),
 }
