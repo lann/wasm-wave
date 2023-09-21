@@ -24,7 +24,6 @@ pub type Span = Range<usize>;
 
 pub struct Tokenizer<'a> {
     input: &'a str,
-    // Invariant: pos must point at a char boundary within input
     pos: usize,
 }
 
@@ -33,11 +32,8 @@ impl<'a> Tokenizer<'a> {
         Self { input, pos: 0 }
     }
 
-    /// # Safety
-    /// May only be passed spans that are valid for the input, such as those
-    /// returned from this Tokenizer.
-    pub unsafe fn get_span(&self, span: Span) -> &str {
-        self.input.get_unchecked(span)
+    pub fn get_span(&self, span: Span) -> &str {
+        self.input.get(span).unwrap()
     }
 
     pub fn pos(&self) -> usize {
@@ -70,7 +66,6 @@ impl<'a> Tokenizer<'a> {
             ']' => Some(Token::RSquare),
             _ => None,
         } {
-            // `pos` invariant holds because we increment by `len_utf8`
             self.pos += ch.len_utf8();
             return Ok(Some(token));
         }
@@ -101,12 +96,10 @@ impl<'a> Tokenizer<'a> {
     }
 
     fn next_chars(&self) -> Chars<'a> {
-        // Safe because of `pos` invariant
-        unsafe { self.input.get_unchecked(self.pos..) }.chars()
+        self.input.get(self.pos..).unwrap().chars()
     }
 
     fn eat_while(&mut self, f: impl Fn(char) -> bool) {
-        // `pos` invariant holds because we count by `len_utf8`
         self.pos += self
             .next_chars()
             .map_while(|ch| f(ch).then(|| ch.len_utf8()))
@@ -123,7 +116,6 @@ impl<'a> Tokenizer<'a> {
 
         let mut escaping = false;
         for ch in chars {
-            // `pos` invariant holds because we count by `len_utf8`
             self.pos += ch.len_utf8();
             if escaping {
                 escaping = false;

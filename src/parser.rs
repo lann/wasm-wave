@@ -85,8 +85,7 @@ impl<'a> Parser<'a> {
                 }
             }
         }
-        let span_str = unsafe { self.tokens.get_span(span) };
-        Ok(span_str.parse()?)
+        Ok(self.tokens.get_span(span).parse()?)
     }
 
     fn parse_char(&mut self) -> Result<char, Error> {
@@ -118,24 +117,20 @@ impl<'a> Parser<'a> {
         while pos < end {
             let (ch, parsed, is_escape) = self.parse_char_inner(Span { start: pos, end })?;
             if is_escape {
-                let chunk = unsafe {
-                    self.tokens.get_span(Span {
-                        start: last_copied,
-                        end: pos,
-                    })
-                };
+                let chunk = self.tokens.get_span(Span {
+                    start: last_copied,
+                    end: pos,
+                });
                 output += chunk;
                 output.push(ch);
                 last_copied = pos + parsed;
             }
             pos += parsed;
         }
-        let last_chunk = unsafe {
-            self.tokens.get_span(Span {
-                start: last_copied,
-                end,
-            })
-        };
+        let last_chunk = self.tokens.get_span(Span {
+            start: last_copied,
+            end,
+        });
         if output.is_empty() {
             // No escapes; we can just return the input span
             Ok(last_chunk.into())
@@ -377,7 +372,7 @@ impl<'a> Parser<'a> {
     // Parse a character within a char or string literal. Also returns the
     // number of bytes parsed and whether it was an escape.
     fn parse_char_inner(&self, span: Span) -> Result<(char, usize, bool), Error> {
-        let span_str = unsafe { self.tokens.get_span(span) };
+        let span_str = self.tokens.get_span(span);
         let mut chars = span_str.chars();
 
         let ch = chars.next().unwrap();
@@ -409,7 +404,7 @@ impl<'a> Parser<'a> {
                         ));
                     }
                 }
-                if chars.skip(num_nibbles).next() != Some('}') {
+                if chars.nth(num_nibbles) != Some('}') {
                     return Err(Error::InvalidEscape(
                         span_str.chars().skip(1).take(2 + num_nibbles + 1).collect(),
                     ));
@@ -427,7 +422,7 @@ impl<'a> Parser<'a> {
 
     fn parse_name(&mut self) -> Result<&str, Error> {
         let span = self.expect(Token::Name)?;
-        Ok(unsafe { self.tokens.get_span(span) })
+        Ok(self.tokens.get_span(span))
     }
 
     fn parse_maybe_payload<V: Val>(&mut self, ty: Option<&V::Type>) -> Result<Option<V>, Error> {
