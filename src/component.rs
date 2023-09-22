@@ -292,4 +292,26 @@ mod tests {
             assert_eq!(got, want, "for {val:?}");
         }
     }
+
+    #[test]
+    fn test_round_trip_floats() {
+        use wasmtime::component::{Val, Type};
+        use std::fmt::Debug;
+
+        fn round_trip<V: crate::Val + PartialEq + Debug>(ty: &V::Type, val: &V) {
+            let val_str = crate::to_string(val).unwrap();
+            let result: V = crate::from_str::<V>(ty, &val_str).unwrap();
+            assert_eq!(val, &result);
+        }
+
+        for i in 0..100 {
+            for j in 0..100 {
+                round_trip(&Type::Float32, &Val::Float32(i as f32 / j as f32));
+                round_trip(&Type::Float64, &Val::Float64(i as f64 / j as f64));
+            }
+        }
+
+        round_trip(&Type::Float32, &Val::Float32(f32::EPSILON));
+        round_trip(&Type::Float64, &Val::Float64(f64::EPSILON));
+    }
 }
