@@ -2,11 +2,13 @@
 
 use std::{
     borrow::Cow,
-    collections::HashMap,
+    collections::HashSet,
     fmt::Display,
     num::{ParseFloatError, ParseIntError},
     str::FromStr,
 };
+
+use indexmap::IndexMap;
 
 use crate::{
     lex::Span,
@@ -55,7 +57,7 @@ impl<'a> Parser<'a> {
             Kind::Option => self.parse_option(ty)?,
             Kind::Result => self.parse_result(ty)?,
             Kind::Flags => self.parse_flags(ty)?,
-            Kind::Unsupported => return Err(Error::Unsupported(format!("{ty:?}"))),
+            Kind::Unsupported => return Err(Error::Unsupported("unsupported type".into())),
         })
     }
 
@@ -154,7 +156,7 @@ impl<'a> Parser<'a> {
             if let Some((Token::RSquare, _)) = self.peek_next_non_whitespace()? {
                 break;
             }
-            elements.push(self.parse_value(&ty.list_element_type())?);
+            elements.push(self.parse_value(&ty.list_element_type().unwrap())?);
             if let (Token::RSquare, _) = self.expect_any_of(&[Token::Comma, Token::RSquare])? {
                 break;
             }
@@ -169,7 +171,7 @@ impl<'a> Parser<'a> {
             .record_fields()
             .enumerate()
             .map(|(idx, (name, ty))| (name, (idx, ty)))
-            .collect::<HashMap<_, _>>();
+            .collect::<IndexMap<_, _>>();
         let mut values = vec![None; field_types.len()];
         loop {
             if let Some((Token::RCurly, _)) = self.peek_next_non_whitespace()? {
@@ -189,18 +191,18 @@ impl<'a> Parser<'a> {
                 break;
             }
         }
-        let fields = ty
-            .record_fields()
+        let fields = field_types
+            .iter()
             .zip(values)
-            .map(|((name, ty), maybe_val)| {
+            .map(|((name, (_, ty)), maybe_val)| {
                 let val = match maybe_val {
                     Some(val) => val,
                     None if ty.kind() == Kind::Option => {
-                        V::make_option(&ty, None).map_err(Error::make_value)?
+                        V::make_option(ty, None).map_err(Error::make_value)?
                     }
                     None => return Err(Error::RecordFieldMissing(name.to_string())),
                 };
-                Ok((name, val))
+                Ok((name.as_ref(), val))
             })
             .collect::<Result<Vec<_>, _>>()?;
         V::make_record(ty, fields).map_err(Error::make_value)
@@ -229,13 +231,20 @@ impl<'a> Parser<'a> {
         let name = self.parse_name()?;
         let (case_name, case_ty) = ty
             .variant_cases()
-            .find(|(case_name, _)| *case_name == name)
+            .find(|(case_name, _)| case_name.as_ref() == name)
             .ok_or_else(|| Error::UnexpectedName {
-                expected: ty.variant_cases().map(|(name, _)| name.into()).collect(),
+                expected: ty
+                    .variant_cases()
+                    .map(|(name, _)| name.as_ref().into())
+                    .collect(),
                 got: name.into(),
             })?;
-        V::make_variant(ty, case_name, self.parse_maybe_payload(case_ty.as_ref())?)
-            .map_err(Error::make_value)
+        V::make_variant(
+            ty,
+            case_name.as_ref(),
+            self.parse_maybe_payload(case_ty.as_ref())?,
+        )
+        .map_err(Error::make_value)
     }
 
     fn parse_enum<V: Val>(&mut self, ty: &V::Type) -> Result<V, Error> {
@@ -251,7 +260,7 @@ impl<'a> Parser<'a> {
                     got: None,
                 })?;
 
-        let some_ty = ty.option_some_type();
+        let some_ty = ty.option_some_type().unwrap();
         let val = if token == Token::Name {
             match self.parse_name()? {
                 "some" => self.parse_maybe_payload(Some(&some_ty))?,
@@ -281,7 +290,7 @@ impl<'a> Parser<'a> {
                     got: None,
                 })?;
 
-        let (ok_ty, err_ty) = ty.result_types();
+        let (ok_ty, err_ty) = ty.result_types().unwrap();
         let (val, is_ok) = if token == Token::Name {
             let (payload_ty, is_ok) = match self.parse_name()? {
                 "ok" => (ok_ty, true),
@@ -314,19 +323,21 @@ impl<'a> Parser<'a> {
 
     fn parse_flags<V: Val>(&mut self, ty: &V::Type) -> Result<V, Error> {
         self.expect(Token::LCurly)?;
+        let names: HashSet<_> = ty.flags_names().collect();
         let mut flags = vec![];
         loop {
             if let Some((Token::RCurly, _)) = self.peek_next_non_whitespace()? {
                 break;
             }
             let name = self.parse_name()?;
-            let flag = ty.flags_names().find(|flag| *flag == name).ok_or_else(|| {
-                Error::UnexpectedName {
-                    expected: ty.flags_names().map(Into::into).collect(),
-                    got: name.into(),
-                }
+            let flag = names.get(name).ok_or_else(|| Error::UnexpectedName {
+                expected: ty
+                    .flags_names()
+                    .map(|name| name.as_ref().to_string())
+                    .collect(),
+                got: name.into(),
             })?;
-            flags.push(flag);
+            flags.push(flag.as_ref());
             if let (Token::RCurly, _) = self.expect_any_of(&[Token::Comma, Token::RCurly])? {
                 break;
             }

@@ -1,6 +1,10 @@
 use std::borrow::Cow;
 
-use crate::{ty::Kind, val::unwrap_val, Type, Val};
+use crate::{
+    ty::{maybe_unwrap, Kind},
+    val::unwrap_val,
+    Type, Val,
+};
 
 impl Type for wasmtime::component::Type {
     fn kind(&self) -> Kind {
@@ -31,61 +35,67 @@ impl Type for wasmtime::component::Type {
         }
     }
 
-    fn list_element_type(&self) -> Self {
-        let Self::List(list) = self else {
-            panic!("list_element_type called on non-list type");
-        };
-        list.ty()
+    fn list_element_type(&self) -> Option<Self> {
+        Some(maybe_unwrap!(self, Self::List)?.ty())
     }
 
-    fn record_fields(&self) -> Box<dyn Iterator<Item = (&str, Self)> + '_> {
+    fn record_fields(&self) -> Box<dyn Iterator<Item = (Cow<str>, Self)> + '_> {
         let Self::Record(record) = self else {
-            panic!("record_fields called on non-record type");
+            return Box::new(std::iter::empty());
         };
-        Box::new(record.fields().map(|f| (f.name, f.ty)))
+        Box::new(record.fields().map(|f| (f.name.into(), f.ty.clone())))
     }
 
     fn tuple_element_types(&self) -> Box<dyn Iterator<Item = Self> + '_> {
         let Self::Tuple(tuple) = self else {
-            panic!("tuple_element_types called on non-tuple type");
+            return Box::new(std::iter::empty());
         };
         Box::new(tuple.types())
     }
 
-    fn variant_cases(&self) -> Box<dyn Iterator<Item = (&str, Option<Self>)> + '_> {
+    fn variant_cases(&self) -> Box<dyn Iterator<Item = (Cow<str>, Option<Self>)> + '_> {
         let Self::Variant(variant) = self else {
-            panic!("variant_cases called on non-variant type");
+            return Box::new(std::iter::empty());
         };
-        Box::new(variant.cases().map(|case| (case.name, case.ty)))
+        Box::new(variant.cases().map(|case| (case.name.into(), case.ty)))
     }
 
-    fn enum_cases(&self) -> Box<dyn Iterator<Item = &str> + '_> {
+    fn enum_cases(&self) -> Box<dyn Iterator<Item = Cow<str>> + '_> {
         let Self::Enum(enum_) = self else {
-            panic!("enum_cases called on non-enum type");
+            return Box::new(std::iter::empty());
         };
-        Box::new(enum_.names())
+        Box::new(enum_.names().map(Into::into))
     }
 
-    fn option_some_type(&self) -> Self {
-        let Self::Option(option) = self else {
-            panic!("option_some_type called on non-option type");
-        };
-        option.ty()
+    fn option_some_type(&self) -> Option<Self> {
+        maybe_unwrap!(self, Self::Option).map(|o| o.ty())
     }
 
-    fn result_types(&self) -> (Option<Self>, Option<Self>) {
-        let Self::Result(result) = self else {
-            panic!("result_types called on non-result type");
-        };
-        (result.ok(), result.err())
+    fn result_types(&self) -> Option<(Option<Self>, Option<Self>)> {
+        let result = maybe_unwrap!(self, Self::Result)?;
+        Some((result.ok(), result.err()))
     }
 
-    fn flags_names(&self) -> Box<dyn Iterator<Item = &str> + '_> {
+    fn flags_names(&self) -> Box<dyn Iterator<Item = Cow<str>> + '_> {
         let Self::Flags(flags) = self else {
-            panic!("flags_names called on non-flags type");
+            return Box::new(std::iter::empty());
         };
-        Box::new(flags.names())
+        Box::new(flags.names().map(Into::into))
     }
+}
+
+macro_rules! impl_primitives {
+    ($Self:ident, $(($case:ident, $ty:ty, $make:ident, $unwrap:ident)),*) => {
+        $(
+            fn $make(val: $ty) -> $Self {
+                $Self::$case(val)
+            }
+
+            fn $unwrap(&self) -> $ty {
+                *unwrap_val!(self, $Self::$case, stringify!($case))
+            }
+        )*
+    };
 }
 
 impl Val for wasmtime::component::Val {
@@ -96,42 +106,22 @@ impl Val for wasmtime::component::Val {
         self.ty()
     }
 
-    fn make_bool(val: bool) -> Self {
-        Self::Bool(val)
-    }
-    fn make_s8(val: i8) -> Self {
-        Self::S8(val)
-    }
-    fn make_s16(val: i16) -> Self {
-        Self::S16(val)
-    }
-    fn make_s32(val: i32) -> Self {
-        Self::S32(val)
-    }
-    fn make_s64(val: i64) -> Self {
-        Self::S64(val)
-    }
-    fn make_u8(val: u8) -> Self {
-        Self::U8(val)
-    }
-    fn make_u16(val: u16) -> Self {
-        Self::U16(val)
-    }
-    fn make_u32(val: u32) -> Self {
-        Self::U32(val)
-    }
-    fn make_u64(val: u64) -> Self {
-        Self::U64(val)
-    }
-    fn make_float32(val: f32) -> Self {
-        Self::Float32(val)
-    }
-    fn make_float64(val: f64) -> Self {
-        Self::Float64(val)
-    }
-    fn make_char(val: char) -> Self {
-        Self::Char(val)
-    }
+    impl_primitives!(
+        Self,
+        (Bool, bool, make_bool, unwrap_bool),
+        (S8, i8, make_s8, unwrap_s8),
+        (S16, i16, make_s16, unwrap_s16),
+        (S32, i32, make_s32, unwrap_s32),
+        (S64, i64, make_s64, unwrap_s64),
+        (U8, u8, make_u8, unwrap_u8),
+        (U16, u16, make_u16, unwrap_u16),
+        (U32, u32, make_u32, unwrap_u32),
+        (U64, u64, make_u64, unwrap_u64),
+        (Float32, f32, make_float32, unwrap_float32),
+        (Float64, f64, make_float64, unwrap_float64),
+        (Char, char, make_char, unwrap_char)
+    );
+
     fn make_string(val: Cow<str>) -> Self {
         Self::String(val.into())
     }
@@ -176,42 +166,6 @@ impl Val for wasmtime::component::Val {
             .new_val(&names.into_iter().collect::<Vec<_>>())
     }
 
-    fn unwrap_bool(&self) -> bool {
-        *unwrap_val!(self, Self::Bool, "bool")
-    }
-    fn unwrap_s8(&self) -> i8 {
-        *unwrap_val!(self, Self::S8, "s8")
-    }
-    fn unwrap_s16(&self) -> i16 {
-        *unwrap_val!(self, Self::S16, "s16")
-    }
-    fn unwrap_s32(&self) -> i32 {
-        *unwrap_val!(self, Self::S32, "s32")
-    }
-    fn unwrap_s64(&self) -> i64 {
-        *unwrap_val!(self, Self::S64, "s64")
-    }
-    fn unwrap_u8(&self) -> u8 {
-        *unwrap_val!(self, Self::U8, "u8")
-    }
-    fn unwrap_u16(&self) -> u16 {
-        *unwrap_val!(self, Self::U16, "u16")
-    }
-    fn unwrap_u32(&self) -> u32 {
-        *unwrap_val!(self, Self::U32, "u32")
-    }
-    fn unwrap_u64(&self) -> u64 {
-        *unwrap_val!(self, Self::U64, "u64")
-    }
-    fn unwrap_float32(&self) -> f32 {
-        *unwrap_val!(self, Self::Float32, "float32")
-    }
-    fn unwrap_float64(&self) -> f64 {
-        *unwrap_val!(self, Self::Float64, "float64")
-    }
-    fn unwrap_char(&self) -> char {
-        *unwrap_val!(self, Self::Char, "char")
-    }
     fn unwrap_string(&self) -> Cow<str> {
         unwrap_val!(self, Self::String, "string").as_ref().into()
     }

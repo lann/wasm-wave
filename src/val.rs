@@ -18,85 +18,85 @@ pub trait Val: Clone + Sized {
 
     /// Returns a new Val of the given type.
     /// # Panics
-    /// The default implementation panics (unimplemented).
+    /// Panics if the type is not implemented (the trait default).
     fn make_bool(val: bool) -> Self {
         unimplemented!()
     }
     /// Returns a new Val of the given type.
     /// # Panics
-    /// The default implementation panics (unimplemented).
+    /// Panics if the type is not implemented (the trait default).
     fn make_s8(val: i8) -> Self {
         unimplemented!()
     }
     /// Returns a new Val of the given type.
     /// # Panics
-    /// The default implementation panics (unimplemented).
+    /// Panics if the type is not implemented (the trait default).
     fn make_s16(val: i16) -> Self {
         unimplemented!()
     }
     /// Returns a new Val of the given type.
     /// # Panics
-    /// The default implementation panics (unimplemented).
+    /// Panics if the type is not implemented (the trait default).
     fn make_s32(val: i32) -> Self {
         unimplemented!()
     }
     /// Returns a new Val of the given type.
     /// # Panics
-    /// The default implementation panics (unimplemented).
+    /// Panics if the type is not implemented (the trait default).
     fn make_s64(val: i64) -> Self {
         unimplemented!()
     }
     /// Returns a new Val of the given type.
     /// # Panics
-    /// The default implementation panics (unimplemented).
+    /// Panics if the type is not implemented (the trait default).
     fn make_u8(val: u8) -> Self {
         unimplemented!()
     }
     /// Returns a new Val of the given type.
     /// # Panics
-    /// The default implementation panics (unimplemented).
+    /// Panics if the type is not implemented (the trait default).
     fn make_u16(val: u16) -> Self {
         unimplemented!()
     }
     /// Returns a new Val of the given type.
     /// # Panics
-    /// The default implementation panics (unimplemented).
+    /// Panics if the type is not implemented (the trait default).
     fn make_u32(val: u32) -> Self {
         unimplemented!()
     }
     /// Returns a new Val of the given type.
     /// # Panics
-    /// The default implementation panics (unimplemented).
+    /// Panics if the type is not implemented (the trait default).
     fn make_u64(val: u64) -> Self {
         unimplemented!()
     }
     /// Returns a new Val of the given type.
     /// # Panics
-    /// The default implementation panics (unimplemented).
+    /// Panics if the type is not implemented (the trait default).
     fn make_float32(val: f32) -> Self {
         unimplemented!()
     }
     /// Returns a new Val of the given type.
     /// # Panics
-    /// The default implementation panics (unimplemented).
+    /// Panics if the type is not implemented (the trait default).
     fn make_float64(val: f64) -> Self {
         unimplemented!()
     }
     /// Returns a new Val of the given type.
     /// # Panics
-    /// The default implementation panics (unimplemented).
+    /// Panics if the type is not implemented (the trait default).
     fn make_char(val: char) -> Self {
         unimplemented!()
     }
     /// Returns a new Val of the given type.
     /// # Panics
-    /// The default implementation panics (unimplemented).
+    /// Panics if the type is not implemented (the trait default).
     fn make_string(val: Cow<str>) -> Self {
         unimplemented!()
     }
     /// Returns a new Val of the given type.
     /// # Panics
-    /// The default implementation panics (unimplemented).
+    /// Panics if the type is not implemented (the trait default).
     fn make_list(
         ty: &Self::Type,
         vals: impl IntoIterator<Item = Self>,
@@ -105,7 +105,7 @@ pub trait Val: Clone + Sized {
     }
     /// Returns a new Val of the given type.
     /// # Panics
-    /// The default implementation panics (unimplemented).
+    /// Panics if the type is not implemented (the trait default).
     fn make_record<'a>(
         ty: &Self::Type,
         fields: impl IntoIterator<Item = (&'a str, Self)>,
@@ -114,7 +114,7 @@ pub trait Val: Clone + Sized {
     }
     /// Returns a new Val of the given type.
     /// # Panics
-    /// The default implementation panics (unimplemented).
+    /// Panics if the type is not implemented (the trait default).
     fn make_tuple(
         ty: &Self::Type,
         vals: impl IntoIterator<Item = Self>,
@@ -123,25 +123,25 @@ pub trait Val: Clone + Sized {
     }
     /// Returns a new Val of the given type.
     /// # Panics
-    /// The default implementation panics (unimplemented).
+    /// Panics if the type is not implemented (the trait default).
     fn make_variant(ty: &Self::Type, case: &str, val: Option<Self>) -> Result<Self, Self::Error> {
         unimplemented!()
     }
     /// Returns a new Val of the given type.
     /// # Panics
-    /// The default implementation panics (unimplemented).
+    /// Panics if the type is not implemented (the trait default).
     fn make_enum(ty: &Self::Type, case: &str) -> Result<Self, Self::Error> {
         unimplemented!()
     }
     /// Returns a new Val of the given type.
     /// # Panics
-    /// The default implementation panics (unimplemented).
+    /// Panics if the type is not implemented (the trait default).
     fn make_option(ty: &Self::Type, val: Option<Self>) -> Result<Self, Self::Error> {
         unimplemented!()
     }
     /// Returns a new Val of the given type.
     /// # Panics
-    /// The default implementation panics (unimplemented).
+    /// Panics if the type is not implemented (the trait default).
     fn make_result(
         ty: &Self::Type,
         val: Result<Option<Self>, Option<Self>>,
@@ -150,7 +150,7 @@ pub trait Val: Clone + Sized {
     }
     /// Returns a new Val of the given type.
     /// # Panics
-    /// The default implementation panics (unimplemented).
+    /// Panics if the type is not implemented (the trait default).
     fn make_flags<'a>(
         ty: &Self::Type,
         names: impl IntoIterator<Item = &'a str>,
@@ -287,8 +287,8 @@ pub trait Val: Clone + Sized {
 }
 
 macro_rules! unwrap_val {
-    ($self:ident, $case:path, $name:expr) => {
-        match $self {
+    ($val:ident, $case:path, $name:expr) => {
+        match $val {
             $case(v) => v,
             _ => panic!("called unwrap_{name} on non-{name} value", name = $name),
         }

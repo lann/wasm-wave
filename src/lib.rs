@@ -8,8 +8,10 @@ mod core;
 mod ty;
 mod val;
 
+pub mod fmt;
 mod lex;
 pub mod parser;
+pub mod value;
 pub mod writer;
 
 use parser::Parser;

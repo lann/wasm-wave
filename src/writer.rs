@@ -24,7 +24,6 @@ impl<W: Write> Writer<W> {
     pub fn write_value<V>(&mut self, val: &V) -> Result<(), Error>
     where
         V: Val,
-        V::Type: Debug,
     {
         let val = val.borrow();
         let ty = val.ty();
@@ -148,7 +147,7 @@ impl<W: Write> Writer<W> {
                 self.write_str("}")?;
                 Ok(())
             }
-            crate::ty::Kind::Unsupported => panic!("unsupported value type {ty:?}"),
+            crate::ty::Kind::Unsupported => panic!("unsupported value type"),
         }
     }
 

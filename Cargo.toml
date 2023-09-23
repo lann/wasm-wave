@@ -11,6 +11,7 @@ readme = "README.md"
 edition = "2021"
 
 [dependencies]
+indexmap = "2.0.0"
 thiserror = "1.0.48"
 wasmtime = { workspace = true }
 
