@@ -28,11 +28,9 @@ impl<T: Type> std::fmt::Debug for TypeDebug<T> {
                 f.write_str(">")
             }
             Kind::Variant => {
-                f.write_str("variant {")?;
+                f.write_str("variant { ")?;
                 for (idx, (name, payload)) in ty.variant_cases().enumerate() {
-                    if f.alternate() {
-                        f.write_str(",\n")?;
-                    } else if idx != 0 {
+                    if idx != 0 {
                         f.write_str(", ")?;
                     }
                     f.write_str(name.as_ref())?;
@@ -40,19 +38,17 @@ impl<T: Type> std::fmt::Debug for TypeDebug<T> {
                         write!(f, "({:?})", Self(ty))?;
                     }
                 }
-                f.write_str("}")
+                f.write_str(" }")
             }
             Kind::Enum => {
-                f.write_str("enum {")?;
+                f.write_str("enum { ")?;
                 for (idx, name) in ty.enum_cases().enumerate() {
-                    if f.alternate() {
-                        f.write_str(",\n")?;
-                    } else if idx != 0 {
+                    if idx != 0 {
                         f.write_str(", ")?;
                     }
                     f.write_str(name.as_ref())?;
                 }
-                f.write_str("}")
+                f.write_str(" }")
             }
             Kind::Option => {
                 write!(f, "option<{:?}>", Self(ty.option_some_type().unwrap()))
@@ -67,18 +63,59 @@ impl<T: Type> std::fmt::Debug for TypeDebug<T> {
                 }
             }
             Kind::Flags => {
-                f.write_str("flags {")?;
+                f.write_str("flags { ")?;
                 for (idx, name) in ty.flags_names().enumerate() {
-                    if f.alternate() {
-                        f.write_str(",\n")?;
-                    } else if idx != 0 {
+                    if idx != 0 {
                         f.write_str(", ")?;
                     }
                     f.write_str(name.as_ref())?;
                 }
-                f.write_str("}")
+                f.write_str(" }")
             }
-            simple => simple.fmt(f),
+            simple => std::fmt::Display::fmt(&simple, f),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::value::ValueType;
+
+    #[test]
+    fn test_type_debug() {
+        for (ty, expected) in [
+            (ValueType::U8, "u8"),
+            (ValueType::list(ValueType::U8), "list<u8>"),
+            (
+                ValueType::tuple([ValueType::U8, ValueType::BOOL]).unwrap(),
+                "tuple<u8, bool>",
+            ),
+            (
+                ValueType::variant([("off", None), ("on", Some(ValueType::U8))]).unwrap(),
+                "variant { off, on(u8) }",
+            ),
+            (
+                ValueType::enum_ty(["east", "west"]).unwrap(),
+                "enum { east, west }",
+            ),
+            (ValueType::option(ValueType::U8), "option<u8>"),
+            (ValueType::result(None, None), "result"),
+            (ValueType::result(Some(ValueType::U8), None), "result<u8>"),
+            (
+                ValueType::result(None, Some(ValueType::STRING)),
+                "result<_, string>",
+            ),
+            (
+                ValueType::result(Some(ValueType::U8), Some(ValueType::STRING)),
+                "result<u8, string>",
+            ),
+            (
+                ValueType::flags(["read", "write"]).unwrap(),
+                "flags { read, write }",
+            ),
+        ] {
+            let debug = format!("{ty:?}");
+            assert_eq!(debug, expected);
         }
     }
 }

@@ -1,0 +1,126 @@
+use crate::Val;
+
+use super::{Value, ValueType};
+
+#[test]
+fn basic_value_round_trips() {
+    for val in [
+        Value::Bool(true),
+        Value::U8(u8::MAX),
+        Value::U16(u16::MAX),
+        Value::U32(u32::MAX),
+        Value::U64(u64::MAX),
+        Value::S8(i8::MIN),
+        Value::S16(i16::MIN),
+        Value::S32(i32::MIN),
+        Value::S64(i64::MIN),
+        Value::Char('☃'),
+        Value::String("str".into()),
+    ] {
+        test_value_round_trip(val)
+    }
+}
+
+#[test]
+fn float_round_trips() {
+    for (float32, float64) in [
+        (0.0, 0.0),
+        (f32::MIN, f64::MIN),
+        (f32::MIN_POSITIVE, f64::MIN_POSITIVE),
+        (f32::MAX, f64::MAX),
+        (f32::EPSILON, f64::EPSILON),
+        (f32::INFINITY, f64::INFINITY),
+        (f32::NEG_INFINITY, f64::NEG_INFINITY),
+    ] {
+        test_value_round_trip(Value::Float32(float32));
+        test_value_round_trip(Value::Float64(float64));
+    }
+}
+
+#[test]
+fn list_round_trips() {
+    let ty = ValueType::list(ValueType::U8);
+    test_value_round_trip(Value::make_list(&ty, []).unwrap());
+    test_value_round_trip(Value::make_list(&ty, [Value::U8(1)]).unwrap());
+    test_value_round_trip(Value::make_list(&ty, [Value::U8(1), Value::U8(2)]).unwrap());
+}
+
+#[test]
+fn record_round_trip() {
+    let option_ty = ValueType::option(ValueType::U8);
+    let record_ty =
+        ValueType::record([("field-a", ValueType::BOOL), ("field-b", option_ty.clone())]).unwrap();
+    let record_val = Value::make_record(
+        &record_ty,
+        [
+            ("field-a", Value::Bool(true)),
+            ("field-b", Value::make_option(&option_ty, None).unwrap()),
+        ],
+    )
+    .unwrap();
+    test_value_round_trip(record_val)
+}
+
+#[test]
+fn tuple_round_trip() {
+    let ty = ValueType::tuple([ValueType::BOOL, ValueType::U8]).unwrap();
+    let val = Value::make_tuple(&ty, [Value::Bool(true), Value::U8(1)]).unwrap();
+    test_value_round_trip(val);
+}
+
+#[test]
+fn variant_round_trips() {
+    let ty = ValueType::variant([("off", None), ("on", Some(ValueType::U8))]).unwrap();
+    test_value_round_trip(Value::make_variant(&ty, "off", None).unwrap());
+    test_value_round_trip(Value::make_variant(&ty, "on", Some(Value::U8(1))).unwrap());
+}
+
+#[test]
+fn enum_round_trips() {
+    let ty = ValueType::enum_ty(["north", "east", "south", "west"]).unwrap();
+    test_value_round_trip(Value::make_enum(&ty, "north").unwrap());
+    test_value_round_trip(Value::make_enum(&ty, "south").unwrap());
+}
+
+#[test]
+fn option_round_trips() {
+    let ty = ValueType::option(ValueType::U8);
+    test_value_round_trip(Value::make_option(&ty, Some(Value::U8(1))).unwrap());
+    test_value_round_trip(Value::make_option(&ty, None).unwrap());
+}
+
+#[test]
+fn result_round_trips() {
+    let no_payloads = ValueType::result(None, None);
+    let both_payloads = ValueType::result(Some(ValueType::U8), Some(ValueType::STRING));
+    let ok_only = ValueType::result(Some(ValueType::U8), None);
+    let err_only = ValueType::result(None, Some(ValueType::STRING));
+    for (ty, payload) in [
+        (&no_payloads, Ok(None)),
+        (&no_payloads, Err(None)),
+        (&both_payloads, Ok(Some(Value::U8(1)))),
+        (&both_payloads, Err(Some(Value::String("oops".into())))),
+        (&ok_only, Ok(Some(Value::U8(1)))),
+        (&ok_only, Err(None)),
+        (&err_only, Ok(None)),
+        (&err_only, Err(Some(Value::String("oops".into())))),
+    ] {
+        let val = Value::make_result(ty, payload).unwrap();
+        test_value_round_trip(val);
+    }
+}
+
+#[test]
+fn flags_round_trips() {
+    let ty = ValueType::flags(["read", "write", "execute"]).unwrap();
+    test_value_round_trip(Value::make_flags(&ty, []).unwrap());
+    test_value_round_trip(Value::make_flags(&ty, ["write"]).unwrap());
+    test_value_round_trip(Value::make_flags(&ty, ["execute", "read"]).unwrap());
+}
+
+fn test_value_round_trip(val: Value) {
+    let ty = val.ty();
+    let serialized = crate::to_string(&val).unwrap();
+    let deserialized: Value = crate::from_str(&ty, &serialized).unwrap();
+    assert_eq!(deserialized, val, "for {val:?}");
+}
