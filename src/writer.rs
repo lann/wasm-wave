@@ -1,4 +1,4 @@
-//! WAVE encoder.
+//! Web Assembly Value Encoding writer.
 
 use std::{borrow::Borrow, fmt::Debug, io::Write};
 
@@ -9,7 +9,9 @@ use crate::{
     val::Val,
 };
 
-/// A WAVE writer (encoder).
+/// A Web Assembly Value Encoding writer.
+///
+/// Writes to the wrapped `W` writer.
 pub struct Writer<W> {
     inner: W,
 }
@@ -21,7 +23,7 @@ impl<W: Write> Writer<W> {
     }
 
     /// WAVE-encodes and writes the given [`Val`] to the underlying writer.
-    pub fn write_value<V>(&mut self, val: &V) -> Result<(), Error>
+    pub fn write_value<V>(&mut self, val: &V) -> Result<(), WriterError>
     where
         V: Val,
     {
@@ -151,17 +153,17 @@ impl<W: Write> Writer<W> {
         }
     }
 
-    fn write_str(&mut self, s: impl AsRef<str>) -> Result<(), Error> {
+    fn write_str(&mut self, s: impl AsRef<str>) -> Result<(), WriterError> {
         self.inner.write_all(s.as_ref().as_bytes())?;
         Ok(())
     }
 
-    fn write_display(&mut self, d: impl std::fmt::Display) -> Result<(), Error> {
+    fn write_display(&mut self, d: impl std::fmt::Display) -> Result<(), WriterError> {
         write!(self.inner, "{d}")?;
         Ok(())
     }
 
-    fn write_char(&mut self, ch: char) -> Result<(), Error> {
+    fn write_char(&mut self, ch: char) -> Result<(), WriterError> {
         if "\\\"\'\t\r\n".contains(ch) {
             write!(self.inner, "{}", ch.escape_default())?;
         } else if ch.is_control() {
@@ -176,7 +178,7 @@ impl<W: Write> Writer<W> {
 /// A Writer error.
 #[derive(Debug, Error)]
 #[non_exhaustive]
-pub enum Error {
+pub enum WriterError {
     /// An error from the underlying writer
     #[error("write failed: {0}")]
     Io(#[from] std::io::Error),

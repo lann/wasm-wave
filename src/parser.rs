@@ -1,4 +1,4 @@
-//! WAVE parser.
+//! Web Assembly Value Encoding parser.
 
 use std::{
     borrow::Cow,
@@ -17,7 +17,7 @@ use crate::{
     Type, Val,
 };
 
-/// A WAVE parser.
+/// A Web Assembly Value Encoding parser.
 pub struct Parser<'a> {
     tokens: Tokenizer<'a>,
     peeked: Option<(Token, Span)>,
@@ -34,7 +34,7 @@ impl<'a> Parser<'a> {
 
     /// Parses a WAVE-encoded value of the given [`Type`] into a corresponding
     /// [`Val`].
-    pub fn parse_value<V: Val>(&mut self, ty: &V::Type) -> Result<V, Error> {
+    pub fn parse_value<V: Val>(&mut self, ty: &V::Type) -> Result<V, ParserError> {
         Ok(match ty.kind() {
             Kind::Bool => V::make_bool(self.parse_bool()?),
             Kind::S8 => V::make_s8(self.parse_number()?),
@@ -57,25 +57,25 @@ impl<'a> Parser<'a> {
             Kind::Option => self.parse_option(ty)?,
             Kind::Result => self.parse_result(ty)?,
             Kind::Flags => self.parse_flags(ty)?,
-            Kind::Unsupported => return Err(Error::Unsupported("unsupported type".into())),
+            Kind::Unsupported => return Err(ParserError::Unsupported("unsupported type".into())),
         })
     }
 
-    fn parse_bool(&mut self) -> Result<bool, Error> {
+    fn parse_bool(&mut self) -> Result<bool, ParserError> {
         match self.parse_name()? {
             "false" => Ok(false),
             "true" => Ok(true),
-            other => Err(Error::UnexpectedName {
+            other => Err(ParserError::UnexpectedName {
                 expected: vec!["false".into(), "true".into()],
                 got: other.into(),
             }),
         }
     }
 
-    fn parse_number<T>(&mut self) -> Result<T, Error>
+    fn parse_number<T>(&mut self) -> Result<T, ParserError>
     where
         T: FromStr,
-        Error: From<T::Err>,
+        ParserError: From<T::Err>,
     {
         let (token, mut span) = self.expect_any_of(&[Token::Dash, Token::Name, Token::Number])?;
         if token == Token::Dash {
@@ -86,7 +86,7 @@ impl<'a> Parser<'a> {
                     span.end = self.tokens.pos();
                 }
                 other => {
-                    return Err(Error::UnexpectedToken {
+                    return Err(ParserError::UnexpectedToken {
                         expected: vec![Token::Name, Token::Number],
                         got: other,
                     })
@@ -96,7 +96,7 @@ impl<'a> Parser<'a> {
         Ok(self.tokens.get_span(span).parse()?)
     }
 
-    fn parse_char(&mut self) -> Result<char, Error> {
+    fn parse_char(&mut self) -> Result<char, ParserError> {
         let span = self.expect(Token::Char)?;
         let inner_span = Span {
             start: span.start + 1,
@@ -104,16 +104,16 @@ impl<'a> Parser<'a> {
         };
         let len = inner_span.len();
         if len == 0 {
-            return Err(Error::InvalidChar("empty"));
+            return Err(ParserError::InvalidChar("empty"));
         }
         let (ch, parsed, _) = self.parse_char_inner(inner_span)?;
         if parsed < len {
-            return Err(Error::InvalidChar("more than one character"));
+            return Err(ParserError::InvalidChar("more than one character"));
         }
         Ok(ch)
     }
 
-    fn parse_string(&mut self) -> Result<Cow<str>, Error> {
+    fn parse_string(&mut self) -> Result<Cow<str>, ParserError> {
         let span = self.expect(Token::String)?;
         let start = span.start + 1;
         let end = span.end - 1;
@@ -148,7 +148,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn parse_list<V: Val>(&mut self, ty: &V::Type) -> Result<V, Error> {
+    fn parse_list<V: Val>(&mut self, ty: &V::Type) -> Result<V, ParserError> {
         self.expect(Token::LSquare)?;
 
         let mut elements = vec![];
@@ -161,10 +161,10 @@ impl<'a> Parser<'a> {
                 break;
             }
         }
-        V::make_list(ty, elements).map_err(Error::make_value)
+        V::make_list(ty, elements).map_err(ParserError::make_value)
     }
 
-    fn parse_record<V: Val>(&mut self, ty: &V::Type) -> Result<V, Error> {
+    fn parse_record<V: Val>(&mut self, ty: &V::Type) -> Result<V, ParserError> {
         self.expect(Token::LCurly)?;
 
         let field_types = ty
@@ -181,7 +181,7 @@ impl<'a> Parser<'a> {
 
             let (idx, ty) = field_types
                 .get(name)
-                .ok_or_else(|| Error::RecordFieldUnknown(name.to_string()))?;
+                .ok_or_else(|| ParserError::RecordFieldUnknown(name.to_string()))?;
 
             self.expect(Token::Colon)?;
 
@@ -198,17 +198,17 @@ impl<'a> Parser<'a> {
                 let val = match maybe_val {
                     Some(val) => val,
                     None if ty.kind() == Kind::Option => {
-                        V::make_option(ty, None).map_err(Error::make_value)?
+                        V::make_option(ty, None).map_err(ParserError::make_value)?
                     }
-                    None => return Err(Error::RecordFieldMissing(name.to_string())),
+                    None => return Err(ParserError::RecordFieldMissing(name.to_string())),
                 };
                 Ok((name.as_ref(), val))
             })
             .collect::<Result<Vec<_>, _>>()?;
-        V::make_record(ty, fields).map_err(Error::make_value)
+        V::make_record(ty, fields).map_err(ParserError::make_value)
     }
 
-    fn parse_tuple<V: Val>(&mut self, ty: &V::Type) -> Result<V, Error> {
+    fn parse_tuple<V: Val>(&mut self, ty: &V::Type) -> Result<V, ParserError> {
         self.expect(Token::LParen)?;
 
         let types = ty.tuple_element_types();
@@ -224,15 +224,15 @@ impl<'a> Parser<'a> {
         if !saw_rparen {
             self.expect(Token::RParen)?;
         }
-        V::make_tuple(ty, values).map_err(Error::make_value)
+        V::make_tuple(ty, values).map_err(ParserError::make_value)
     }
 
-    fn parse_variant<V: Val>(&mut self, ty: &V::Type) -> Result<V, Error> {
+    fn parse_variant<V: Val>(&mut self, ty: &V::Type) -> Result<V, ParserError> {
         let name = self.parse_name()?;
         let (case_name, case_ty) = ty
             .variant_cases()
             .find(|(case_name, _)| case_name.as_ref() == name)
-            .ok_or_else(|| Error::UnexpectedName {
+            .ok_or_else(|| ParserError::UnexpectedName {
                 expected: ty
                     .variant_cases()
                     .map(|(name, _)| name.as_ref().into())
@@ -244,18 +244,18 @@ impl<'a> Parser<'a> {
             case_name.as_ref(),
             self.parse_maybe_payload(case_ty.as_ref())?,
         )
-        .map_err(Error::make_value)
+        .map_err(ParserError::make_value)
     }
 
-    fn parse_enum<V: Val>(&mut self, ty: &V::Type) -> Result<V, Error> {
+    fn parse_enum<V: Val>(&mut self, ty: &V::Type) -> Result<V, ParserError> {
         let name = self.parse_name()?;
-        V::make_enum(ty, name).map_err(Error::make_value)
+        V::make_enum(ty, name).map_err(ParserError::make_value)
     }
 
-    fn parse_option<V: Val>(&mut self, ty: &V::Type) -> Result<V, Error> {
+    fn parse_option<V: Val>(&mut self, ty: &V::Type) -> Result<V, ParserError> {
         let (token, _) =
             self.peek_next_non_whitespace()?
-                .ok_or_else(|| Error::UnexpectedToken {
+                .ok_or_else(|| ParserError::UnexpectedToken {
                     expected: vec![Token::Name],
                     got: None,
                 })?;
@@ -266,7 +266,7 @@ impl<'a> Parser<'a> {
                 "some" => self.parse_maybe_payload(Some(&some_ty))?,
                 "none" => None,
                 other => {
-                    return Err(Error::UnexpectedName {
+                    return Err(ParserError::UnexpectedName {
                         expected: vec!["some".into(), "none".into()],
                         got: other.into(),
                     })
@@ -275,17 +275,17 @@ impl<'a> Parser<'a> {
         } else {
             // Flattened `some` value
             if some_ty.kind() == Kind::Option {
-                return Err(Error::InvalidFlattening(Kind::Result));
+                return Err(ParserError::InvalidFlattening(Kind::Result));
             }
             Some(self.parse_value(&some_ty)?)
         };
-        V::make_option(ty, val).map_err(Error::make_value)
+        V::make_option(ty, val).map_err(ParserError::make_value)
     }
 
-    fn parse_result<V: Val>(&mut self, ty: &V::Type) -> Result<V, Error> {
+    fn parse_result<V: Val>(&mut self, ty: &V::Type) -> Result<V, ParserError> {
         let (token, _) =
             self.peek_next_non_whitespace()?
-                .ok_or_else(|| Error::UnexpectedToken {
+                .ok_or_else(|| ParserError::UnexpectedToken {
                     expected: vec![Token::Name],
                     got: None,
                 })?;
@@ -296,7 +296,7 @@ impl<'a> Parser<'a> {
                 "ok" => (ok_ty, true),
                 "err" => (err_ty, false),
                 other => {
-                    return Err(Error::UnexpectedName {
+                    return Err(ParserError::UnexpectedName {
                         expected: vec!["ok".into(), "err".into()],
                         got: other.into(),
                     })
@@ -307,21 +307,21 @@ impl<'a> Parser<'a> {
         } else if let Some(ty) = ok_ty {
             // Flattened `ok` value
             if ty.kind() == Kind::Result {
-                return Err(Error::InvalidFlattening(Kind::Result));
+                return Err(ParserError::InvalidFlattening(Kind::Result));
             }
             let val = self.parse_value(&ty)?;
             (Some(val), true)
         } else {
-            return Err(Error::UnexpectedToken {
+            return Err(ParserError::UnexpectedToken {
                 expected: vec![Token::Name],
                 got: Some(token),
             });
         };
 
-        V::make_result(ty, if is_ok { Ok(val) } else { Err(val) }).map_err(Error::make_value)
+        V::make_result(ty, if is_ok { Ok(val) } else { Err(val) }).map_err(ParserError::make_value)
     }
 
-    fn parse_flags<V: Val>(&mut self, ty: &V::Type) -> Result<V, Error> {
+    fn parse_flags<V: Val>(&mut self, ty: &V::Type) -> Result<V, ParserError> {
         self.expect(Token::LCurly)?;
         let names: HashSet<_> = ty.flags_names().collect();
         let mut flags = vec![];
@@ -330,7 +330,7 @@ impl<'a> Parser<'a> {
                 break;
             }
             let name = self.parse_name()?;
-            let flag = names.get(name).ok_or_else(|| Error::UnexpectedName {
+            let flag = names.get(name).ok_or_else(|| ParserError::UnexpectedName {
                 expected: ty
                     .flags_names()
                     .map(|name| name.as_ref().to_string())
@@ -342,10 +342,10 @@ impl<'a> Parser<'a> {
                 break;
             }
         }
-        V::make_flags(ty, flags).map_err(Error::make_value)
+        V::make_flags(ty, flags).map_err(ParserError::make_value)
     }
 
-    fn next_non_whitespace(&mut self) -> Result<Option<(Token, Span)>, Error> {
+    fn next_non_whitespace(&mut self) -> Result<Option<(Token, Span)>, ParserError> {
         if let Some(peeked) = self.peeked.take() {
             return Ok(Some(peeked));
         }
@@ -358,37 +358,37 @@ impl<'a> Parser<'a> {
         Ok(None)
     }
 
-    fn peek_next_non_whitespace(&mut self) -> Result<Option<(Token, Span)>, Error> {
+    fn peek_next_non_whitespace(&mut self) -> Result<Option<(Token, Span)>, ParserError> {
         self.peeked = self.next_non_whitespace()?;
         Ok(self.peeked.clone())
     }
 
-    fn expect_any_of(&mut self, expected: &[Token]) -> Result<(Token, Span), Error> {
+    fn expect_any_of(&mut self, expected: &[Token]) -> Result<(Token, Span), ParserError> {
         if let Some((token, span)) = self.next_non_whitespace()? {
             if expected.contains(&token) {
                 Ok((token, span))
             } else {
-                Err(Error::UnexpectedToken {
+                Err(ParserError::UnexpectedToken {
                     expected: expected.to_vec(),
                     got: Some(token),
                 })
             }
         } else {
-            Err(Error::UnexpectedToken {
+            Err(ParserError::UnexpectedToken {
                 expected: expected.to_vec(),
                 got: None,
             })
         }
     }
 
-    fn expect(&mut self, expected: Token) -> Result<Span, Error> {
+    fn expect(&mut self, expected: Token) -> Result<Span, ParserError> {
         let (_, span) = self.expect_any_of(&[expected])?;
         Ok(span)
     }
 
     // Parse a character within a char or string literal. Also returns the
     // number of bytes parsed and whether it was an escape.
-    fn parse_char_inner(&self, span: Span) -> Result<(char, usize, bool), Error> {
+    fn parse_char_inner(&self, span: Span) -> Result<(char, usize, bool), ParserError> {
         let span_str = self.tokens.get_span(span);
         let mut chars = span_str.chars();
 
@@ -404,7 +404,7 @@ impl<'a> Parser<'a> {
             't' => Ok(('\t', 2, true)),
             'u' => {
                 if chars.next() != Some('{') {
-                    return Err(Error::InvalidEscape(
+                    return Err(ParserError::InvalidEscape(
                         span_str.chars().skip(1).take(2).collect(),
                     ));
                 }
@@ -416,33 +416,36 @@ impl<'a> Parser<'a> {
                     value <<= 4;
                     value |= nibble;
                     if value > 0x10FFFF {
-                        return Err(Error::InvalidEscape(
+                        return Err(ParserError::InvalidEscape(
                             span_str.chars().skip(1).take(2 + num_nibbles + 1).collect(),
                         ));
                     }
                 }
                 if chars.nth(num_nibbles) != Some('}') {
-                    return Err(Error::InvalidEscape(
+                    return Err(ParserError::InvalidEscape(
                         span_str.chars().skip(1).take(2 + num_nibbles + 1).collect(),
                     ));
                 }
                 match value.try_into() {
                     Ok(ch) => Ok((ch, 3 + num_nibbles + 1, true)),
-                    Err(_) => Err(Error::InvalidEscape(
+                    Err(_) => Err(ParserError::InvalidEscape(
                         span_str.chars().skip(1).take(2 + num_nibbles + 1).collect(),
                     )),
                 }
             }
-            other => Err(Error::InvalidEscape(other.to_string())),
+            other => Err(ParserError::InvalidEscape(other.to_string())),
         }
     }
 
-    fn parse_name(&mut self) -> Result<&str, Error> {
+    fn parse_name(&mut self) -> Result<&str, ParserError> {
         let span = self.expect(Token::Name)?;
         Ok(self.tokens.get_span(span))
     }
 
-    fn parse_maybe_payload<V: Val>(&mut self, ty: Option<&V::Type>) -> Result<Option<V>, Error> {
+    fn parse_maybe_payload<V: Val>(
+        &mut self,
+        ty: Option<&V::Type>,
+    ) -> Result<Option<V>, ParserError> {
         if let Some(ty) = ty {
             self.expect(Token::LParen)?;
             let val = self.parse_value(ty)?;
@@ -456,7 +459,7 @@ impl<'a> Parser<'a> {
 
 /// A WAVE Parser error.
 #[derive(Debug, thiserror::Error)]
-pub enum Error {
+pub enum ParserError {
     /// Invalid char encoding
     #[error("invalid char: {0}")]
     InvalidChar(&'static str),
@@ -468,7 +471,7 @@ pub enum Error {
     InvalidFlattening(Kind),
     /// Lexing (tokenizing) error
     #[error("invalid token: {0}")]
-    Lex(#[from] crate::lex::Error),
+    Lex(#[from] crate::lex::LexError),
     /// Error returned by a [`Val`]`::make_*` method
     #[error("error constructing value: {0}")]
     MakeValueError(String),
@@ -508,7 +511,7 @@ pub enum Error {
     Unsupported(String),
 }
 
-impl Error {
+impl ParserError {
     fn make_value(err: impl Display) -> Self {
         Self::MakeValueError(err.to_string())
     }

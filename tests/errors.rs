@@ -28,7 +28,7 @@ fn test_errors() {
 
 fn assert_reject(type_name: &str, input: &str) {
     let ty = get_type(type_name);
-    let result: Result<Val, wasm_wave::parser::Error> = wasm_wave::from_str(&ty, input);
+    let result: Result<Val, wasm_wave::parser::ParserError> = wasm_wave::from_str(&ty, input);
     match result {
         Ok(got) => panic!("failed to reject {input:?}; got '{got:?}'"),
         Err(err) => {

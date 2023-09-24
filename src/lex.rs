@@ -40,7 +40,7 @@ impl<'a> Tokenizer<'a> {
         self.pos
     }
 
-    pub fn next_token(&mut self) -> Result<Option<Token>, Error> {
+    pub fn next_token(&mut self) -> Result<Option<Token>, LexError> {
         debug_assert!(self.pos <= self.input.len());
 
         let mut chars = self.next_chars();
@@ -90,7 +90,7 @@ impl<'a> Tokenizer<'a> {
                 self.eat_string('"')?;
                 Token::String
             }
-            _ => return Err(Error::UnexpectedChar(self.pos)),
+            _ => return Err(LexError::UnexpectedChar(self.pos)),
         };
         Ok(Some(token))
     }
@@ -107,7 +107,7 @@ impl<'a> Tokenizer<'a> {
     }
 
     // Eat a string (one delimiter to the next, including any backslash-escaped delimiters)
-    fn eat_string(&mut self, delim: char) -> Result<(), Error> {
+    fn eat_string(&mut self, delim: char) -> Result<(), LexError> {
         let mut chars = self.next_chars();
 
         let first = chars.next().unwrap();
@@ -125,12 +125,12 @@ impl<'a> Tokenizer<'a> {
                 return Ok(());
             }
         }
-        Err(Error::UnexpectedEnd)
+        Err(LexError::UnexpectedEnd)
     }
 }
 
 impl<'a> Iterator for Tokenizer<'a> {
-    type Item = Result<(Token, Span), Error>;
+    type Item = Result<(Token, Span), LexError>;
 
     fn next(&mut self) -> Option<Self::Item> {
         let start = self.pos();
@@ -149,7 +149,7 @@ impl<'a> Iterator for Tokenizer<'a> {
 }
 
 #[derive(Debug, thiserror::Error)]
-pub enum Error {
+pub enum LexError {
     #[error("unexpected character at position {0}")]
     UnexpectedChar(usize),
     #[error("unexpected end of input")]

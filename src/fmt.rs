@@ -1,4 +1,4 @@
-//! Formatting types.
+//! Debug formatting types.
 
 use crate::{ty::Kind, Type};
 

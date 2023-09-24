@@ -1,9 +1,10 @@
+//! Value enum for WAVE values.
 #![allow(missing_docs)]
 
+mod convert;
 #[cfg(test)]
 mod tests;
 mod ty;
-mod convert;
 
 use std::{borrow::Cow, collections::HashMap};
 
@@ -18,7 +19,7 @@ use self::ty::{
     EnumType, FlagsType, ListType, OptionType, RecordType, ResultType, TupleType, VariantType,
 };
 
-/// A Value is a dynamically-typed value.
+/// A Value is a WAVE value.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {
     Bool(bool),
@@ -110,7 +111,7 @@ macro_rules! impl_primitives {
 impl Val for Value {
     type Type = ValueType;
 
-    type Error = Error;
+    type Error = ValueError;
 
     fn ty(&self) -> Self::Type {
         match self {
@@ -164,11 +165,11 @@ impl Val for Value {
     ) -> Result<Self, Self::Error> {
         let element_type = ty
             .list_element_type()
-            .ok_or_else(|| Error::InvalidType(format!("{ty:?} is not a valid list type")))?;
+            .ok_or_else(|| ValueError::InvalidType(format!("{ty:?} is not a valid list type")))?;
         let elements = vals
             .into_iter()
             .map(|v| check_type(&element_type, v))
-            .collect::<Result<_, Error>>()?;
+            .collect::<Result<_, ValueError>>()?;
         let ty = maybe_unwrap!(ty, ValueType::List).unwrap().clone();
         Ok(Self::List(List { ty, elements }))
     }
@@ -182,16 +183,16 @@ impl Val for Value {
         for (name, ty) in ty.record_fields() {
             let val = field_vals
                 .remove(&*name)
-                .ok_or_else(|| Error::MissingField(name.into()))?;
+                .ok_or_else(|| ValueError::MissingField(name.into()))?;
             fields.push(check_type(&ty, val)?);
         }
         if fields.is_empty() {
-            return Err(Error::InvalidType(format!(
+            return Err(ValueError::InvalidType(format!(
                 "{ty:?} is not a valid record type"
             )));
         }
         if let Some(unknown) = field_vals.into_keys().next() {
-            return Err(Error::MissingField(unknown.into()));
+            return Err(ValueError::MissingField(unknown.into()));
         }
         let ty = maybe_unwrap!(ty, ValueType::Record).unwrap().clone();
         Ok(Self::Record(Record { ty, fields }))
@@ -208,12 +209,12 @@ impl Val for Value {
             .map(|(idx, val)| {
                 let ty = types
                     .get(idx)
-                    .ok_or_else(|| Error::InvalidValue("too many tuple values".into()))?;
+                    .ok_or_else(|| ValueError::InvalidValue("too many tuple values".into()))?;
                 check_type(ty, val)
             })
-            .collect::<Result<Vec<_>, Error>>()?;
+            .collect::<Result<Vec<_>, ValueError>>()?;
         if types.len() != elements.len() {
-            return Err(Error::InvalidValue(format!(
+            return Err(ValueError::InvalidValue(format!(
                 "tuple needs {} values; got {}",
                 types.len(),
                 elements.len()
@@ -228,7 +229,7 @@ impl Val for Value {
             .variant_cases()
             .enumerate()
             .find_map(|(idx, (name, ty))| (name == case).then_some((idx, ty)))
-            .ok_or_else(|| Error::InvalidValue(format!("unknown case `{case}` for {ty:?}")))?;
+            .ok_or_else(|| ValueError::InvalidValue(format!("unknown case `{case}` for {ty:?}")))?;
         let payload = check_option_type(&payload_type, val)?;
         let ty = maybe_unwrap!(ty, ValueType::Variant).unwrap().clone();
         Ok(Self::Variant(Variant { ty, case, payload }))
@@ -238,7 +239,7 @@ impl Val for Value {
         let case = ty
             .enum_cases()
             .position(|name| name == case)
-            .ok_or_else(|| Error::InvalidValue(format!("unknown case `{case}` for {ty:?}")))?;
+            .ok_or_else(|| ValueError::InvalidValue(format!("unknown case `{case}` for {ty:?}")))?;
         let ty = maybe_unwrap!(ty, ValueType::Enum).unwrap().clone();
         Ok(Self::Enum(Enum { ty, case }))
     }
@@ -246,7 +247,7 @@ impl Val for Value {
     fn make_option(ty: &Self::Type, val: Option<Self>) -> Result<Self, Self::Error> {
         let some_type = ty
             .option_some_type()
-            .ok_or_else(|| Error::InvalidType(format!("{ty:?} is not an option type")))?;
+            .ok_or_else(|| ValueError::InvalidType(format!("{ty:?} is not an option type")))?;
         let value = val
             .map(|val| Ok(Box::new(check_type(&some_type, val)?)))
             .transpose()?;
@@ -260,7 +261,7 @@ impl Val for Value {
     ) -> Result<Self, Self::Error> {
         let (ok_type, err_type) = ty
             .result_types()
-            .ok_or_else(|| Error::InvalidType(format!("{ty:?} is not a result type")))?;
+            .ok_or_else(|| ValueError::InvalidType(format!("{ty:?} is not a result type")))?;
         let value = match val {
             Ok(ok) => Ok(check_option_type(&ok_type, ok)?),
             Err(err) => Err(check_option_type(&err_type, err)?),
@@ -280,9 +281,9 @@ impl Val for Value {
                 flag_names
                     .iter()
                     .position(|flag| flag == name)
-                    .ok_or_else(|| Error::InvalidValue(format!("unknown flag `{name}`")))
+                    .ok_or_else(|| ValueError::InvalidValue(format!("unknown flag `{name}`")))
             })
-            .collect::<Result<Vec<_>, Error>>()?;
+            .collect::<Result<Vec<_>, ValueError>>()?;
         let ty = maybe_unwrap!(ty, ValueType::Flags).unwrap().clone();
         Ok(Self::Flags(Flags { ty, flags }))
     }
@@ -345,10 +346,10 @@ fn cow<T: ToOwned + ?Sized>(t: &T) -> Cow<T> {
     Cow::Borrowed(t)
 }
 
-fn check_type(expected: &ValueType, val: Value) -> Result<Value, Error> {
+fn check_type(expected: &ValueType, val: Value) -> Result<Value, ValueError> {
     let got = val.ty();
     if &got != expected {
-        return Err(Error::InvalidType(format!(
+        return Err(ValueError::InvalidType(format!(
             "expected {expected:?}, got {got:?}"
         )));
     }
@@ -358,11 +359,11 @@ fn check_type(expected: &ValueType, val: Value) -> Result<Value, Error> {
 fn check_option_type(
     expected: &Option<ValueType>,
     val: Option<Value>,
-) -> Result<Option<Box<Value>>, Error> {
+) -> Result<Option<Box<Value>>, ValueError> {
     match (expected, val) {
         (Some(ty), Some(val)) => Ok(Some(Box::new(check_type(ty, val)?))),
         (None, None) => Ok(None),
-        (ty, val) => Err(Error::InvalidValue(format!(
+        (ty, val) => Err(ValueError::InvalidValue(format!(
             "invalid payload {val:?}; expected {ty:?}"
         ))),
     }
@@ -370,7 +371,7 @@ fn check_option_type(
 
 /// Value errors.
 #[derive(Debug, thiserror::Error)]
-pub enum Error {
+pub enum ValueError {
     #[error("missing field `{0}`")]
     MissingField(Box<str>),
 
