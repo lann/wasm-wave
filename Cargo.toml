@@ -10,13 +10,20 @@ repository = "https://github.com/lann/wave"
 readme = "README.md"
 edition = "2021"
 
+[features]
+default = ["wasmtime", "wit"]
+wasmtime = ["dep:wasmtime"]
+wit = ["dep:wit-parser"]
+
 [dependencies]
 indexmap = "2.0.0"
 thiserror = "1.0.48"
-wasmtime = { workspace = true }
+wasmtime = { workspace = true, optional = true }
+wit-parser = { workspace = true, optional = true }
 
 [dev-dependencies]
-wasmtime = { workspace = true, features = ["cranelift"] }
+wasmtime = { workspace = true, optional = false, features = ["cranelift"] }
 
 [workspace.dependencies]
 wasmtime = { version = "13.0.0", default-features = false, features = ["component-model"] }
+wit-parser = "0.11.1"

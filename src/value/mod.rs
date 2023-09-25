@@ -6,6 +6,12 @@ mod convert;
 mod tests;
 mod ty;
 
+#[cfg(feature = "wit")]
+mod wit;
+
+#[cfg(feature = "wit")]
+pub use wit::resolve_wit_type;
+
 use std::{borrow::Cow, collections::HashMap};
 
 use crate::{

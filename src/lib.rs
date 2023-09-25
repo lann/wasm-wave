@@ -3,11 +3,12 @@
 //! <https://github.com/lann/wave>
 #![deny(missing_docs)]
 
-mod component;
-mod core;
 mod lex;
 mod ty;
 mod val;
+
+#[cfg(feature = "wasmtime")]
+mod wasmtime;
 
 pub mod fmt;
 pub mod parser;
