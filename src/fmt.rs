@@ -1,6 +1,6 @@
 //! Debug formatting types.
 
-use crate::{ty::WasmTypeKind, WasmType};
+use crate::{ty::WasmTypeKind, WasmFunc, WasmType};
 
 /// Implements Debug for [`WasmType`]s.
 pub struct TypeDebug<T>(pub T);
@@ -76,6 +76,53 @@ impl<T: WasmType> std::fmt::Debug for TypeDebug<T> {
                 f.write_str(" }")
             }
             simple => std::fmt::Display::fmt(&simple, f),
+        }
+    }
+}
+
+/// Implements Debug for [`WasmFunc`]s.
+pub struct FuncDebug<T>(pub T);
+
+impl<T: WasmFunc> std::fmt::Debug for FuncDebug<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("func(")?;
+        let mut param_names = self.0.param_names();
+        for (idx, ty) in self.0.params().enumerate() {
+            if idx != 0 {
+                f.write_str(", ")?;
+            }
+            if let Some(name) = param_names.next() {
+                write!(f, "{name}: ")?;
+            }
+            TypeDebug(ty).fmt(f)?
+        }
+        f.write_str(")")?;
+
+        let results = self.0.results().collect::<Vec<_>>();
+        if results.is_empty() {
+            return Ok(());
+        }
+
+        let mut result_names = self.0.result_names();
+        if results.len() == 1 {
+            let ty = TypeDebug(results.into_iter().next().unwrap());
+            if let Some(name) = result_names.next() {
+                write!(f, " -> ({name}: {ty:?})")
+            } else {
+                write!(f, " -> {ty:?}")
+            }
+        } else {
+            f.write_str(" -> (")?;
+            for (idx, ty) in results.into_iter().enumerate() {
+                if idx != 0 {
+                    f.write_str(", ")?;
+                }
+                if let Some(name) = result_names.next() {
+                    write!(f, "{name}: ")?;
+                }
+                TypeDebug(ty).fmt(f)?;
+            }
+            f.write_str(")")
         }
     }
 }

@@ -39,4 +39,6 @@ world tests {
         write,
     }
     export %flags: func() -> flags-type
+
+    export func-type: func(a: bool, b: enum-type) -> result<u8>
 }

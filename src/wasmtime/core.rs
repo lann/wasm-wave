@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use crate::{ty::WasmTypeKind, val::unwrap_val, WasmType, WasmValue};
+use crate::{ty::WasmTypeKind, val::unwrap_val, WasmFunc, WasmType, WasmValue};
 
 impl WasmType for wasmtime::ValType {
     fn kind(&self) -> WasmTypeKind {
@@ -87,6 +87,18 @@ impl WasmValue for wasmtime::Val {
                 .into_iter()
                 .map(Cow::Owned),
         )
+    }
+}
+
+impl WasmFunc for wasmtime::FuncType {
+    type Type = wasmtime::ValType;
+
+    fn params(&self) -> Box<dyn Iterator<Item = Self::Type> + '_> {
+        Box::new(self.params())
+    }
+
+    fn results(&self) -> Box<dyn Iterator<Item = Self::Type> + '_> {
+        Box::new(self.results())
     }
 }
 

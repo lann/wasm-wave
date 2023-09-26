@@ -1,5 +1,5 @@
 use wit_parser::{
-    Enum, Flags, Record, Resolve, Result_, Tuple, Type, TypeDefKind, TypeId, Variant,
+    Enum, Flags, Function, Record, Resolve, Result_, Tuple, Type, TypeDefKind, TypeId, Variant,
 };
 
 use crate::value;
@@ -12,6 +12,22 @@ pub fn resolve_wit_type(
     type_id: TypeId,
 ) -> Result<value::Type, value::ValueError> {
     TypeResolver { resolve }.resolve_type_id(type_id)
+}
+
+/// Resolves a [`value::FuncType`] from the given [`wit_parser::Resolve`] and [`Function`].
+/// # Panics
+/// Panics if `function`'s types are not valid in `resolve`.
+pub fn resolve_wit_func_type(
+    resolve: &Resolve,
+    function: &Function,
+) -> Result<value::FuncType, value::ValueError> {
+    let resolver = TypeResolver { resolve };
+    let params = resolver.resolve_params(&function.params)?;
+    let results = match &function.results {
+        wit_parser::Results::Named(results) => resolver.resolve_params(results)?,
+        wit_parser::Results::Anon(ty) => vec![("".into(), resolver.resolve_type(*ty)?)],
+    };
+    value::FuncType::new(params, results)
 }
 
 struct TypeResolver<'a> {
@@ -27,6 +43,19 @@ impl<'a> TypeResolver<'a> {
 
     fn resolve_type(&self, ty: Type) -> ValueResult {
         self.resolve(&TypeDefKind::Type(ty))
+    }
+
+    fn resolve_params(
+        &self,
+        params: &[(String, Type)],
+    ) -> Result<Vec<(String, value::Type)>, value::ValueError> {
+        params
+            .iter()
+            .map(|(name, ty)| {
+                let ty = self.resolve_type(*ty)?;
+                Ok((name.clone(), ty))
+            })
+            .collect()
     }
 
     fn resolve(&self, mut kind: &'a TypeDefKind) -> ValueResult {
@@ -131,7 +160,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn smoke_test() {
+    fn resolve_wit_type_smoke_test() {
         let unresolved = UnresolvedPackage::parse(
             "test.wit".as_ref(),
             r#"
@@ -148,5 +177,42 @@ mod tests {
         let (type_id, _) = resolve.types.iter().next().unwrap();
         let ty = resolve_wit_type(&resolve, type_id).unwrap();
         assert_eq!(ty, value::Type::U8);
+    }
+
+    #[test]
+    fn resolve_wit_func_type_smoke_test() {
+        let unresolved = UnresolvedPackage::parse(
+            "test.wit".as_ref(),
+            r#"
+            package test:types
+            interface types {
+                type uint8 = u8
+                no-results: func(a: uint8, b: string)
+                one-result: func(c: uint8, d: string) -> uint8
+                named-results: func(e: uint8, f: string) -> (x: u8, y: string)
+            }
+        "#,
+        )
+        .unwrap();
+        let mut resolve = Resolve::new();
+        resolve.push(unresolved).unwrap();
+
+        for (func_name, debug) in [
+            ("no-results", "func(a: u8, b: string)"),
+            ("one-result", "func(c: u8, d: string) -> u8"),
+            (
+                "named-results",
+                "func(e: u8, f: string) -> (x: u8, y: string)",
+            ),
+        ] {
+            let function = resolve
+                .interfaces
+                .iter()
+                .flat_map(|(_, i)| &i.functions)
+                .find_map(|(name, function)| (name == func_name).then_some(function))
+                .unwrap();
+            let ty = resolve_wit_func_type(&resolve, function).unwrap();
+            assert_eq!(format!("{ty:?}"), debug, "for {function:?}");
+        }
     }
 }

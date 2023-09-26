@@ -66,6 +66,21 @@ fn test_round_trip_variations() {
     }
 }
 
+#[test]
+fn test_wasmtime_get_func_type() {
+    let func = with_instance_and_store(|instance, store| {
+        let func = instance
+            .exports(&mut *store)
+            .root()
+            .func("func-type")
+            .unwrap();
+        wasm_wave::wasmtime::get_func_type(&func, store)
+    });
+
+    let debug = format!("{func:?}");
+    assert_eq!(debug, "func(bool, enum { first, second }) -> result<u8>");
+}
+
 fn assert_round_trip(type_name: &str, input: &str, output: &str) {
     let ty = get_type(type_name);
     let deserialized: Val = wasm_wave::from_str(&ty, input)
@@ -75,7 +90,7 @@ fn assert_round_trip(type_name: &str, input: &str, output: &str) {
     assert_eq!(reserialized, output);
 }
 
-fn get_type(name: &str) -> Type {
+fn with_instance_and_store<T>(f: impl Fn(&Instance, &mut Store<()>) -> T) -> T {
     static INSTANCE_AND_STORE: OnceLock<(Instance, Mutex<Store<()>>)> = OnceLock::new();
     let (instance, store) = INSTANCE_AND_STORE.get_or_init(|| {
         let engine = Engine::new(Config::new().wasm_component_model(true)).expect("engine");
@@ -88,10 +103,16 @@ fn get_type(name: &str) -> Type {
         (instance, Mutex::new(store))
     });
     let mut store = store.lock().unwrap();
-    let func = instance
-        .exports(&mut *store)
-        .root()
-        .func(name)
-        .unwrap_or_else(|| panic!("export func named {name:?}"));
-    func.results(&*store)[0].clone()
+    f(instance, &mut store)
+}
+
+fn get_type(name: &str) -> Type {
+    with_instance_and_store(|instance, store| {
+        let func = instance
+            .exports(&mut *store)
+            .root()
+            .func(name)
+            .unwrap_or_else(|| panic!("export func named {name:?}"));
+        func.results(&*store)[0].clone()
+    })
 }

@@ -5,11 +5,12 @@ mod convert;
 mod tests;
 mod ty;
 
+mod func;
 #[cfg(feature = "wit")]
 mod wit;
 
 #[cfg(feature = "wit")]
-pub use wit::resolve_wit_type;
+pub use wit::{resolve_wit_func_type, resolve_wit_type};
 
 use std::{borrow::Cow, collections::HashMap};
 
@@ -22,8 +23,9 @@ use crate::{
     WasmType, WasmValue,
 };
 
+pub use func::FuncType;
 /// The [`WasmType`] of a [`Value`].
-pub use self::ty::Type;
+pub use ty::Type;
 
 /// A Value is a WAVE value.
 #[derive(Debug, Clone, PartialEq)]
@@ -387,13 +389,9 @@ fn check_option_type(
 /// Value errors.
 #[derive(Debug, thiserror::Error)]
 pub enum ValueError {
-    /// Missing record field.
-    #[error("missing field `{0}`")]
-    MissingField(Box<str>),
-
-    /// Unknown record field.
-    #[error("unknown field `{0}`")]
-    UnknownField(Box<str>),
+    /// Invalid func type.
+    #[error("invalid func type: {0}")]
+    InvalidFuncType(String),
 
     /// Invalid type.
     #[error("invalid type: {0}")]
@@ -402,4 +400,12 @@ pub enum ValueError {
     /// Invalid value.
     #[error("invalid value: {0}")]
     InvalidValue(String),
+
+    /// Missing record field.
+    #[error("missing field `{0}`")]
+    MissingField(Box<str>),
+
+    /// Unknown record field.
+    #[error("unknown field `{0}`")]
+    UnknownField(Box<str>),
 }

@@ -1,9 +1,10 @@
 use std::borrow::Cow;
 
 use crate::{
+    fmt::FuncDebug,
     ty::{maybe_unwrap, WasmTypeKind},
     val::unwrap_val,
-    WasmType, WasmValue,
+    WasmFunc, WasmType, WasmValue,
 };
 
 impl WasmType for wasmtime::component::Type {
@@ -200,6 +201,46 @@ impl WasmValue for wasmtime::component::Val {
     fn unwrap_flags(&self) -> Box<dyn Iterator<Item = Cow<str>> + '_> {
         let flags = unwrap_val!(self, Self::Flags, "flags");
         Box::new(flags.flags().map(Into::into))
+    }
+}
+
+/// Represents a [`wasmtime::component::Func`] type.
+#[derive(Clone)]
+pub struct FuncType {
+    /// The func's parameters.
+    pub params: Box<[wasmtime::component::Type]>,
+    /// The func's results.
+    pub results: Box<[wasmtime::component::Type]>,
+}
+
+impl WasmFunc for FuncType {
+    type Type = wasmtime::component::Type;
+
+    fn params(&self) -> Box<dyn Iterator<Item = Self::Type> + '_> {
+        Box::new(self.params.iter().cloned())
+    }
+
+    fn results(&self) -> Box<dyn Iterator<Item = Self::Type> + '_> {
+        Box::new(self.results.iter().cloned())
+    }
+}
+
+impl std::fmt::Debug for FuncType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        FuncDebug(self.clone()).fmt(f)
+    }
+}
+
+/// Returns a [`FuncType`] for the given `func` and `store`.
+/// # Panics
+/// Panics if `func` didn't come from `store`.
+pub fn get_func_type(
+    func: &wasmtime::component::Func,
+    store: &impl wasmtime::AsContext,
+) -> FuncType {
+    FuncType {
+        params: func.params(store),
+        results: func.results(store),
     }
 }
 
