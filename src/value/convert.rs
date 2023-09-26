@@ -1,17 +1,17 @@
-use crate::{ty::Kind, Val};
+use crate::{ty::WasmTypeKind, WasmValue};
 
-use super::{Value, ValueType};
+use super::{Type, Value};
 
 trait ValueTyped {
-    fn value_type() -> ValueType;
+    fn value_type() -> Type;
 }
 
 macro_rules! impl_primitives {
     ($Self:ty, $(($case:ident, $ty:ty)),*) => {
         $(
             impl ValueTyped for $ty {
-                fn value_type() -> ValueType {
-                    ValueType::Simple(Kind::$case)
+                fn value_type() -> Type {
+                    Type::Simple(WasmTypeKind::$case)
                 }
             }
 
@@ -41,8 +41,8 @@ impl_primitives!(
 );
 
 impl ValueTyped for String {
-    fn value_type() -> ValueType {
-        ValueType::Simple(Kind::String)
+    fn value_type() -> Type {
+        Type::Simple(WasmTypeKind::String)
     }
 }
 
@@ -53,7 +53,7 @@ impl From<String> for Value {
 }
 
 impl<'a> ValueTyped for &'a str {
-    fn value_type() -> ValueType {
+    fn value_type() -> Type {
         String::value_type()
     }
 }
@@ -65,8 +65,8 @@ impl<'a> From<&'a str> for Value {
 }
 
 impl<const N: usize, T: ValueTyped> ValueTyped for [T; N] {
-    fn value_type() -> ValueType {
-        ValueType::list(T::value_type())
+    fn value_type() -> Type {
+        Type::list(T::value_type())
     }
 }
 
@@ -79,8 +79,8 @@ impl<const N: usize, T: ValueTyped + Into<Value>> From<[T; N]> for Value {
 }
 
 impl<T: ValueTyped> ValueTyped for Vec<T> {
-    fn value_type() -> ValueType {
-        ValueType::list(T::value_type())
+    fn value_type() -> Type {
+        Type::list(T::value_type())
     }
 }
 
@@ -93,8 +93,8 @@ impl<T: ValueTyped + Into<Value>> From<Vec<T>> for Value {
 }
 
 impl<T: ValueTyped> ValueTyped for Option<T> {
-    fn value_type() -> ValueType {
-        ValueType::option(T::value_type())
+    fn value_type() -> Type {
+        Type::option(T::value_type())
     }
 }
 
@@ -106,8 +106,8 @@ impl<T: ValueTyped + Into<Value>> From<Option<T>> for Value {
 }
 
 impl<T: ValueTyped, U: ValueTyped> ValueTyped for Result<T, U> {
-    fn value_type() -> ValueType {
-        ValueType::result(Some(T::value_type()), Some(U::value_type()))
+    fn value_type() -> Type {
+        Type::result(Some(T::value_type()), Some(U::value_type()))
     }
 }
 
@@ -126,8 +126,8 @@ macro_rules! impl_tuple {
     ($(($($var:ident),*)),*) => {
         $(
             impl<$($var: ValueTyped),*> ValueTyped for ($($var),*,) {
-                fn value_type() -> ValueType {
-                    ValueType::tuple(vec![$($var::value_type()),*]).unwrap()
+                fn value_type() -> Type {
+                    Type::tuple(vec![$($var::value_type()),*]).unwrap()
                 }
             }
 
@@ -186,7 +186,7 @@ mod tests {
             (Ok::<u8, String>(1).into(), "ok(1)"),
             (Err::<u8, String>("oops".into()).into(), "err(\"oops\")"),
             ((1,).into(), "(1)"),
-            ((1, "str", [9;2]).into(), "(1, \"str\", [9, 9])"),
+            ((1, "str", [9; 2]).into(), "(1, \"str\", [9, 9])"),
         ] {
             let val: Value = val;
             let got = crate::to_string(&val).unwrap();

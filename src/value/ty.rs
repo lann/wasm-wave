@@ -1,49 +1,39 @@
-//! ValueType
-
 use std::borrow::Cow;
 
 use crate::{
-    ty::{maybe_unwrap, Kind},
-    Type,
+    ty::{maybe_unwrap, WasmTypeKind},
+    WasmType,
 };
 
-/// The [`Type`] of a [`super::Value`].
 #[derive(Clone, PartialEq)]
-pub enum ValueType {
-    /// Simple type (no type parameters)
-    Simple(Kind),
-    /// List type
+#[allow(missing_docs)]
+pub enum Type {
+    Simple(WasmTypeKind),
     List(ListType),
-    /// Record type
     Record(RecordType),
-    /// Tuple type
     Tuple(TupleType),
-    /// Variant type
     Variant(VariantType),
-    /// Enum type
     Enum(EnumType),
-    /// Option type
     Option(OptionType),
-    /// Result type
     Result(ResultType),
-    /// Flags type
     Flags(FlagsType),
 }
 
-impl ValueType {
-    pub const BOOL: Self = Self::Simple(Kind::Bool);
-    pub const S8: Self = Self::Simple(Kind::S8);
-    pub const S16: Self = Self::Simple(Kind::S16);
-    pub const S32: Self = Self::Simple(Kind::S32);
-    pub const S64: Self = Self::Simple(Kind::S64);
-    pub const U8: Self = Self::Simple(Kind::U8);
-    pub const U16: Self = Self::Simple(Kind::U16);
-    pub const U32: Self = Self::Simple(Kind::U32);
-    pub const U64: Self = Self::Simple(Kind::U64);
-    pub const FLOAT32: Self = Self::Simple(Kind::Float32);
-    pub const FLOAT64: Self = Self::Simple(Kind::Float64);
-    pub const CHAR: Self = Self::Simple(Kind::Char);
-    pub const STRING: Self = Self::Simple(Kind::String);
+#[allow(missing_docs)]
+impl Type {
+    pub const BOOL: Self = Self::Simple(WasmTypeKind::Bool);
+    pub const S8: Self = Self::Simple(WasmTypeKind::S8);
+    pub const S16: Self = Self::Simple(WasmTypeKind::S16);
+    pub const S32: Self = Self::Simple(WasmTypeKind::S32);
+    pub const S64: Self = Self::Simple(WasmTypeKind::S64);
+    pub const U8: Self = Self::Simple(WasmTypeKind::U8);
+    pub const U16: Self = Self::Simple(WasmTypeKind::U16);
+    pub const U32: Self = Self::Simple(WasmTypeKind::U32);
+    pub const U64: Self = Self::Simple(WasmTypeKind::U64);
+    pub const FLOAT32: Self = Self::Simple(WasmTypeKind::Float32);
+    pub const FLOAT64: Self = Self::Simple(WasmTypeKind::Float64);
+    pub const CHAR: Self = Self::Simple(WasmTypeKind::Char);
+    pub const STRING: Self = Self::Simple(WasmTypeKind::String);
 
     /// Returns a list type with the given element type.
     pub fn list(element_type: impl Into<Box<Self>>) -> Self {
@@ -127,22 +117,22 @@ impl ValueType {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ListType {
-    pub(super) element: Box<ValueType>,
+    pub(super) element: Box<Type>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct RecordType {
-    pub(super) fields: Vec<(Box<str>, ValueType)>,
+    pub(super) fields: Vec<(Box<str>, Type)>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct TupleType {
-    pub(super) elements: Vec<ValueType>,
+    pub(super) elements: Vec<Type>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct VariantType {
-    pub(super) cases: Vec<(Box<str>, Option<ValueType>)>,
+    pub(super) cases: Vec<(Box<str>, Option<Type>)>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -152,13 +142,13 @@ pub struct EnumType {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct OptionType {
-    pub(super) some: Box<ValueType>,
+    pub(super) some: Box<Type>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ResultType {
-    pub(super) ok: Option<Box<ValueType>>,
-    pub(super) err: Option<Box<ValueType>>,
+    pub(super) ok: Option<Box<Type>>,
+    pub(super) err: Option<Box<Type>>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -166,18 +156,18 @@ pub struct FlagsType {
     pub(super) flags: Vec<Box<str>>,
 }
 
-impl Type for ValueType {
-    fn kind(&self) -> Kind {
+impl WasmType for Type {
+    fn kind(&self) -> WasmTypeKind {
         match self {
-            ValueType::Simple(kind) => *kind,
-            ValueType::List(_) => Kind::List,
-            ValueType::Record(_) => Kind::Record,
-            ValueType::Tuple(_) => Kind::Tuple,
-            ValueType::Variant(_) => Kind::Variant,
-            ValueType::Enum(_) => Kind::Enum,
-            ValueType::Option(_) => Kind::Option,
-            ValueType::Result(_) => Kind::Result,
-            ValueType::Flags(_) => Kind::Flags,
+            Type::Simple(kind) => *kind,
+            Type::List(_) => WasmTypeKind::List,
+            Type::Record(_) => WasmTypeKind::Record,
+            Type::Tuple(_) => WasmTypeKind::Tuple,
+            Type::Variant(_) => WasmTypeKind::Variant,
+            Type::Enum(_) => WasmTypeKind::Enum,
+            Type::Option(_) => WasmTypeKind::Option,
+            Type::Result(_) => WasmTypeKind::Result,
+            Type::Flags(_) => WasmTypeKind::Flags,
         }
     }
 
@@ -245,7 +235,7 @@ impl Type for ValueType {
     }
 }
 
-impl std::fmt::Debug for ValueType {
+impl std::fmt::Debug for Type {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         crate::fmt::TypeDebug(self.clone()).fmt(f)
     }

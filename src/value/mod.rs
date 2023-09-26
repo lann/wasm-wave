@@ -1,5 +1,4 @@
 //! Value enum for WAVE values.
-#![allow(missing_docs)]
 
 mod convert;
 #[cfg(test)]
@@ -14,19 +13,21 @@ pub use wit::resolve_wit_type;
 
 use std::{borrow::Cow, collections::HashMap};
 
-use crate::{
-    ty::{maybe_unwrap, Kind},
-    val::unwrap_val,
-    Type, Val,
-};
-
-pub use self::ty::ValueType;
 use self::ty::{
     EnumType, FlagsType, ListType, OptionType, RecordType, ResultType, TupleType, VariantType,
 };
+use crate::{
+    ty::{maybe_unwrap, WasmTypeKind},
+    val::unwrap_val,
+    WasmType, WasmValue,
+};
+
+/// The [`WasmType`] of a [`Value`].
+pub use self::ty::Type;
 
 /// A Value is a WAVE value.
 #[derive(Debug, Clone, PartialEq)]
+#[allow(missing_docs)]
 pub enum Value {
     Bool(bool),
     S8(i8),
@@ -52,24 +53,28 @@ pub enum Value {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+#[doc(hidden)]
 pub struct List {
     ty: ListType,
     elements: Vec<Value>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
+#[doc(hidden)]
 pub struct Record {
     ty: RecordType,
     fields: Vec<Value>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
+#[doc(hidden)]
 pub struct Tuple {
     ty: TupleType,
     elements: Vec<Value>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
+#[doc(hidden)]
 pub struct Variant {
     ty: VariantType,
     case: usize,
@@ -77,24 +82,28 @@ pub struct Variant {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+#[doc(hidden)]
 pub struct Enum {
     ty: EnumType,
     case: usize,
 }
 
 #[derive(Debug, Clone, PartialEq)]
+#[doc(hidden)]
 pub struct OptionValue {
     ty: OptionType,
     value: Option<Box<Value>>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
+#[doc(hidden)]
 pub struct ResultValue {
     ty: ResultType,
     value: Result<Option<Box<Value>>, Option<Box<Value>>>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
+#[doc(hidden)]
 pub struct Flags {
     ty: FlagsType,
     flags: Vec<usize>,
@@ -114,34 +123,34 @@ macro_rules! impl_primitives {
     };
 }
 
-impl Val for Value {
-    type Type = ValueType;
+impl WasmValue for Value {
+    type Type = Type;
 
     type Error = ValueError;
 
     fn ty(&self) -> Self::Type {
         match self {
-            Self::Bool(_) => ValueType::Simple(Kind::Bool),
-            Self::S8(_) => ValueType::Simple(Kind::S8),
-            Self::S16(_) => ValueType::Simple(Kind::S16),
-            Self::S32(_) => ValueType::Simple(Kind::S32),
-            Self::S64(_) => ValueType::Simple(Kind::S64),
-            Self::U8(_) => ValueType::Simple(Kind::U8),
-            Self::U16(_) => ValueType::Simple(Kind::U16),
-            Self::U32(_) => ValueType::Simple(Kind::U32),
-            Self::U64(_) => ValueType::Simple(Kind::U64),
-            Self::Float32(_) => ValueType::Simple(Kind::Float32),
-            Self::Float64(_) => ValueType::Simple(Kind::Float64),
-            Self::Char(_) => ValueType::Simple(Kind::Char),
-            Self::String(_) => ValueType::Simple(Kind::String),
-            Self::List(inner) => ValueType::List(inner.ty.clone()),
-            Self::Record(inner) => ValueType::Record(inner.ty.clone()),
-            Self::Tuple(inner) => ValueType::Tuple(inner.ty.clone()),
-            Self::Variant(inner) => ValueType::Variant(inner.ty.clone()),
-            Self::Enum(inner) => ValueType::Enum(inner.ty.clone()),
-            Self::Option(inner) => ValueType::Option(inner.ty.clone()),
-            Self::Result(inner) => ValueType::Result(inner.ty.clone()),
-            Self::Flags(inner) => ValueType::Flags(inner.ty.clone()),
+            Self::Bool(_) => Type::Simple(WasmTypeKind::Bool),
+            Self::S8(_) => Type::Simple(WasmTypeKind::S8),
+            Self::S16(_) => Type::Simple(WasmTypeKind::S16),
+            Self::S32(_) => Type::Simple(WasmTypeKind::S32),
+            Self::S64(_) => Type::Simple(WasmTypeKind::S64),
+            Self::U8(_) => Type::Simple(WasmTypeKind::U8),
+            Self::U16(_) => Type::Simple(WasmTypeKind::U16),
+            Self::U32(_) => Type::Simple(WasmTypeKind::U32),
+            Self::U64(_) => Type::Simple(WasmTypeKind::U64),
+            Self::Float32(_) => Type::Simple(WasmTypeKind::Float32),
+            Self::Float64(_) => Type::Simple(WasmTypeKind::Float64),
+            Self::Char(_) => Type::Simple(WasmTypeKind::Char),
+            Self::String(_) => Type::Simple(WasmTypeKind::String),
+            Self::List(inner) => Type::List(inner.ty.clone()),
+            Self::Record(inner) => Type::Record(inner.ty.clone()),
+            Self::Tuple(inner) => Type::Tuple(inner.ty.clone()),
+            Self::Variant(inner) => Type::Variant(inner.ty.clone()),
+            Self::Enum(inner) => Type::Enum(inner.ty.clone()),
+            Self::Option(inner) => Type::Option(inner.ty.clone()),
+            Self::Result(inner) => Type::Result(inner.ty.clone()),
+            Self::Flags(inner) => Type::Flags(inner.ty.clone()),
         }
     }
 
@@ -176,7 +185,7 @@ impl Val for Value {
             .into_iter()
             .map(|v| check_type(&element_type, v))
             .collect::<Result<_, ValueError>>()?;
-        let ty = maybe_unwrap!(ty, ValueType::List).unwrap().clone();
+        let ty = maybe_unwrap!(ty, Type::List).unwrap().clone();
         Ok(Self::List(List { ty, elements }))
     }
 
@@ -200,7 +209,7 @@ impl Val for Value {
         if let Some(unknown) = field_vals.into_keys().next() {
             return Err(ValueError::MissingField(unknown.into()));
         }
-        let ty = maybe_unwrap!(ty, ValueType::Record).unwrap().clone();
+        let ty = maybe_unwrap!(ty, Type::Record).unwrap().clone();
         Ok(Self::Record(Record { ty, fields }))
     }
 
@@ -226,7 +235,7 @@ impl Val for Value {
                 elements.len()
             )));
         }
-        let ty = maybe_unwrap!(ty, ValueType::Tuple).unwrap().clone();
+        let ty = maybe_unwrap!(ty, Type::Tuple).unwrap().clone();
         Ok(Self::Tuple(Tuple { ty, elements }))
     }
 
@@ -237,7 +246,7 @@ impl Val for Value {
             .find_map(|(idx, (name, ty))| (name == case).then_some((idx, ty)))
             .ok_or_else(|| ValueError::InvalidValue(format!("unknown case `{case}` for {ty:?}")))?;
         let payload = check_option_type(&payload_type, val)?;
-        let ty = maybe_unwrap!(ty, ValueType::Variant).unwrap().clone();
+        let ty = maybe_unwrap!(ty, Type::Variant).unwrap().clone();
         Ok(Self::Variant(Variant { ty, case, payload }))
     }
 
@@ -246,7 +255,7 @@ impl Val for Value {
             .enum_cases()
             .position(|name| name == case)
             .ok_or_else(|| ValueError::InvalidValue(format!("unknown case `{case}` for {ty:?}")))?;
-        let ty = maybe_unwrap!(ty, ValueType::Enum).unwrap().clone();
+        let ty = maybe_unwrap!(ty, Type::Enum).unwrap().clone();
         Ok(Self::Enum(Enum { ty, case }))
     }
 
@@ -257,7 +266,7 @@ impl Val for Value {
         let value = val
             .map(|val| Ok(Box::new(check_type(&some_type, val)?)))
             .transpose()?;
-        let ty = maybe_unwrap!(ty, ValueType::Option).unwrap().clone();
+        let ty = maybe_unwrap!(ty, Type::Option).unwrap().clone();
         Ok(Self::Option(OptionValue { ty, value }))
     }
 
@@ -272,7 +281,7 @@ impl Val for Value {
             Ok(ok) => Ok(check_option_type(&ok_type, ok)?),
             Err(err) => Err(check_option_type(&err_type, err)?),
         };
-        let ty = maybe_unwrap!(ty, ValueType::Result).unwrap().clone();
+        let ty = maybe_unwrap!(ty, Type::Result).unwrap().clone();
         Ok(Self::Result(ResultValue { ty, value }))
     }
 
@@ -290,7 +299,7 @@ impl Val for Value {
                     .ok_or_else(|| ValueError::InvalidValue(format!("unknown flag `{name}`")))
             })
             .collect::<Result<Vec<_>, ValueError>>()?;
-        let ty = maybe_unwrap!(ty, ValueType::Flags).unwrap().clone();
+        let ty = maybe_unwrap!(ty, Type::Flags).unwrap().clone();
         Ok(Self::Flags(Flags { ty, flags }))
     }
 
@@ -352,7 +361,7 @@ fn cow<T: ToOwned + ?Sized>(t: &T) -> Cow<T> {
     Cow::Borrowed(t)
 }
 
-fn check_type(expected: &ValueType, val: Value) -> Result<Value, ValueError> {
+fn check_type(expected: &Type, val: Value) -> Result<Value, ValueError> {
     let got = val.ty();
     if &got != expected {
         return Err(ValueError::InvalidType(format!(
@@ -363,7 +372,7 @@ fn check_type(expected: &ValueType, val: Value) -> Result<Value, ValueError> {
 }
 
 fn check_option_type(
-    expected: &Option<ValueType>,
+    expected: &Option<Type>,
     val: Option<Value>,
 ) -> Result<Option<Box<Value>>, ValueError> {
     match (expected, val) {
@@ -378,15 +387,19 @@ fn check_option_type(
 /// Value errors.
 #[derive(Debug, thiserror::Error)]
 pub enum ValueError {
+    /// Missing record field.
     #[error("missing field `{0}`")]
     MissingField(Box<str>),
 
+    /// Unknown record field.
     #[error("unknown field `{0}`")]
     UnknownField(Box<str>),
 
+    /// Invalid type.
     #[error("invalid type: {0}")]
     InvalidType(String),
 
+    /// Invalid value.
     #[error("invalid value: {0}")]
     InvalidValue(String),
 }

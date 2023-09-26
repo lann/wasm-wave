@@ -1,6 +1,6 @@
-use crate::Val;
+use crate::WasmValue;
 
-use super::{Value, ValueType};
+use super::{Type, Value};
 
 #[test]
 fn basic_value_round_trips() {
@@ -39,7 +39,7 @@ fn float_round_trips() {
 
 #[test]
 fn list_round_trips() {
-    let ty = ValueType::list(ValueType::U8);
+    let ty = Type::list(Type::U8);
     test_value_round_trip(Value::make_list(&ty, []).unwrap());
     test_value_round_trip(Value::make_list(&ty, [Value::U8(1)]).unwrap());
     test_value_round_trip(Value::make_list(&ty, [Value::U8(1), Value::U8(2)]).unwrap());
@@ -47,9 +47,9 @@ fn list_round_trips() {
 
 #[test]
 fn record_round_trip() {
-    let option_ty = ValueType::option(ValueType::U8);
+    let option_ty = Type::option(Type::U8);
     let record_ty =
-        ValueType::record([("field-a", ValueType::BOOL), ("field-b", option_ty.clone())]).unwrap();
+        Type::record([("field-a", Type::BOOL), ("field-b", option_ty.clone())]).unwrap();
     let record_val = Value::make_record(
         &record_ty,
         [
@@ -63,38 +63,38 @@ fn record_round_trip() {
 
 #[test]
 fn tuple_round_trip() {
-    let ty = ValueType::tuple([ValueType::BOOL, ValueType::U8]).unwrap();
+    let ty = Type::tuple([Type::BOOL, Type::U8]).unwrap();
     let val = Value::make_tuple(&ty, [Value::Bool(true), Value::U8(1)]).unwrap();
     test_value_round_trip(val);
 }
 
 #[test]
 fn variant_round_trips() {
-    let ty = ValueType::variant([("off", None), ("on", Some(ValueType::U8))]).unwrap();
+    let ty = Type::variant([("off", None), ("on", Some(Type::U8))]).unwrap();
     test_value_round_trip(Value::make_variant(&ty, "off", None).unwrap());
     test_value_round_trip(Value::make_variant(&ty, "on", Some(Value::U8(1))).unwrap());
 }
 
 #[test]
 fn enum_round_trips() {
-    let ty = ValueType::enum_ty(["north", "east", "south", "west"]).unwrap();
+    let ty = Type::enum_ty(["north", "east", "south", "west"]).unwrap();
     test_value_round_trip(Value::make_enum(&ty, "north").unwrap());
     test_value_round_trip(Value::make_enum(&ty, "south").unwrap());
 }
 
 #[test]
 fn option_round_trips() {
-    let ty = ValueType::option(ValueType::U8);
+    let ty = Type::option(Type::U8);
     test_value_round_trip(Value::make_option(&ty, Some(Value::U8(1))).unwrap());
     test_value_round_trip(Value::make_option(&ty, None).unwrap());
 }
 
 #[test]
 fn result_round_trips() {
-    let no_payloads = ValueType::result(None, None);
-    let both_payloads = ValueType::result(Some(ValueType::U8), Some(ValueType::STRING));
-    let ok_only = ValueType::result(Some(ValueType::U8), None);
-    let err_only = ValueType::result(None, Some(ValueType::STRING));
+    let no_payloads = Type::result(None, None);
+    let both_payloads = Type::result(Some(Type::U8), Some(Type::STRING));
+    let ok_only = Type::result(Some(Type::U8), None);
+    let err_only = Type::result(None, Some(Type::STRING));
     for (ty, payload) in [
         (&no_payloads, Ok(None)),
         (&no_payloads, Err(None)),
@@ -112,7 +112,7 @@ fn result_round_trips() {
 
 #[test]
 fn flags_round_trips() {
-    let ty = ValueType::flags(["read", "write", "execute"]).unwrap();
+    let ty = Type::flags(["read", "write", "execute"]).unwrap();
     test_value_round_trip(Value::make_flags(&ty, []).unwrap());
     test_value_round_trip(Value::make_flags(&ty, ["write"]).unwrap());
     test_value_round_trip(Value::make_flags(&ty, ["execute", "read"]).unwrap());

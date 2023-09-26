@@ -5,8 +5,8 @@ use std::{borrow::Borrow, fmt::Debug, io::Write};
 use thiserror::Error;
 
 use crate::{
-    ty::{Kind, Type},
-    val::Val,
+    ty::{WasmType, WasmTypeKind},
+    val::WasmValue,
 };
 
 /// A Web Assembly Value Encoding writer.
@@ -22,26 +22,26 @@ impl<W: Write> Writer<W> {
         Self { inner: w }
     }
 
-    /// WAVE-encodes and writes the given [`Val`] to the underlying writer.
+    /// WAVE-encodes and writes the given [`WasmValue`] to the underlying writer.
     pub fn write_value<V>(&mut self, val: &V) -> Result<(), WriterError>
     where
-        V: Val,
+        V: WasmValue,
     {
         let val = val.borrow();
         let ty = val.ty();
         match ty.kind() {
-            crate::ty::Kind::Bool => {
+            crate::ty::WasmTypeKind::Bool => {
                 self.write_str(if val.unwrap_bool() { "true" } else { "false" })
             }
-            crate::ty::Kind::S8 => self.write_display(val.unwrap_s8()),
-            crate::ty::Kind::S16 => self.write_display(val.unwrap_s16()),
-            crate::ty::Kind::S32 => self.write_display(val.unwrap_s32()),
-            crate::ty::Kind::S64 => self.write_display(val.unwrap_s64()),
-            crate::ty::Kind::U8 => self.write_display(val.unwrap_u8()),
-            crate::ty::Kind::U16 => self.write_display(val.unwrap_u16()),
-            crate::ty::Kind::U32 => self.write_display(val.unwrap_u32()),
-            crate::ty::Kind::U64 => self.write_display(val.unwrap_u64()),
-            crate::ty::Kind::Float32 => {
+            crate::ty::WasmTypeKind::S8 => self.write_display(val.unwrap_s8()),
+            crate::ty::WasmTypeKind::S16 => self.write_display(val.unwrap_s16()),
+            crate::ty::WasmTypeKind::S32 => self.write_display(val.unwrap_s32()),
+            crate::ty::WasmTypeKind::S64 => self.write_display(val.unwrap_s64()),
+            crate::ty::WasmTypeKind::U8 => self.write_display(val.unwrap_u8()),
+            crate::ty::WasmTypeKind::U16 => self.write_display(val.unwrap_u16()),
+            crate::ty::WasmTypeKind::U32 => self.write_display(val.unwrap_u32()),
+            crate::ty::WasmTypeKind::U64 => self.write_display(val.unwrap_u64()),
+            crate::ty::WasmTypeKind::Float32 => {
                 let f = val.unwrap_float32();
                 if f.is_nan() {
                     self.write_str("nan") // Display is "NaN"
@@ -49,7 +49,7 @@ impl<W: Write> Writer<W> {
                     self.write_display(f)
                 }
             }
-            crate::ty::Kind::Float64 => {
+            crate::ty::WasmTypeKind::Float64 => {
                 let f = val.unwrap_float64();
                 if f.is_nan() {
                     self.write_str("nan") // Display is "NaN"
@@ -57,19 +57,19 @@ impl<W: Write> Writer<W> {
                     self.write_display(f)
                 }
             }
-            crate::ty::Kind::Char => {
+            crate::ty::WasmTypeKind::Char => {
                 self.write_str("'")?;
                 self.write_char(val.unwrap_char())?;
                 self.write_str("'")
             }
-            crate::ty::Kind::String => {
+            crate::ty::WasmTypeKind::String => {
                 self.write_str("\"")?;
                 for ch in val.unwrap_string().chars() {
                     self.write_char(ch)?;
                 }
                 self.write_str("\"")
             }
-            crate::ty::Kind::List => {
+            crate::ty::WasmTypeKind::List => {
                 self.write_str("[")?;
                 for (idx, val) in val.unwrap_list().enumerate() {
                     if idx != 0 {
@@ -79,11 +79,13 @@ impl<W: Write> Writer<W> {
                 }
                 self.write_str("]")
             }
-            crate::ty::Kind::Record => {
+            crate::ty::WasmTypeKind::Record => {
                 self.write_str("{")?;
                 let mut first = true;
                 for (name, val) in val.unwrap_record() {
-                    if !matches!(val.ty().kind(), Kind::Option) || val.unwrap_option().is_some() {
+                    if !matches!(val.ty().kind(), WasmTypeKind::Option)
+                        || val.unwrap_option().is_some()
+                    {
                         if first {
                             first = false;
                         } else {
@@ -96,7 +98,7 @@ impl<W: Write> Writer<W> {
                 }
                 self.write_str("}")
             }
-            crate::ty::Kind::Tuple => {
+            crate::ty::WasmTypeKind::Tuple => {
                 self.write_str("(")?;
                 for (idx, val) in val.unwrap_tuple().enumerate() {
                     if idx != 0 {
@@ -106,7 +108,7 @@ impl<W: Write> Writer<W> {
                 }
                 self.write_str(")")
             }
-            crate::ty::Kind::Variant => {
+            crate::ty::WasmTypeKind::Variant => {
                 let (name, val) = val.unwrap_variant();
                 self.write_str(name)?;
                 if let Some(val) = val {
@@ -116,8 +118,8 @@ impl<W: Write> Writer<W> {
                 }
                 Ok(())
             }
-            crate::ty::Kind::Enum => self.write_str(val.unwrap_enum()),
-            crate::ty::Kind::Option => match val.unwrap_option() {
+            crate::ty::WasmTypeKind::Enum => self.write_str(val.unwrap_enum()),
+            crate::ty::WasmTypeKind::Option => match val.unwrap_option() {
                 Some(val) => {
                     self.write_str("some(")?;
                     self.write_value(&*val)?;
@@ -125,7 +127,7 @@ impl<W: Write> Writer<W> {
                 }
                 None => self.write_str("none"),
             },
-            crate::ty::Kind::Result => {
+            crate::ty::WasmTypeKind::Result => {
                 let (name, val) = match val.unwrap_result() {
                     Ok(val) => ("ok", val),
                     Err(val) => ("err", val),
@@ -138,7 +140,7 @@ impl<W: Write> Writer<W> {
                 }
                 Ok(())
             }
-            crate::ty::Kind::Flags => {
+            crate::ty::WasmTypeKind::Flags => {
                 self.write_str("{")?;
                 for (idx, name) in val.unwrap_flags().enumerate() {
                     if idx != 0 {
@@ -149,7 +151,7 @@ impl<W: Write> Writer<W> {
                 self.write_str("}")?;
                 Ok(())
             }
-            crate::ty::Kind::Unsupported => panic!("unsupported value type"),
+            crate::ty::WasmTypeKind::Unsupported => panic!("unsupported value type"),
         }
     }
 

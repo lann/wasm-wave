@@ -13,8 +13,8 @@ use indexmap::IndexMap;
 use crate::{
     lex::Span,
     lex::{Token, Tokenizer},
-    ty::Kind,
-    Type, Val,
+    ty::WasmTypeKind,
+    WasmType, WasmValue,
 };
 
 /// A Web Assembly Value Encoding parser.
@@ -32,32 +32,34 @@ impl<'a> Parser<'a> {
         }
     }
 
-    /// Parses a WAVE-encoded value of the given [`Type`] into a corresponding
-    /// [`Val`].
-    pub fn parse_value<V: Val>(&mut self, ty: &V::Type) -> Result<V, ParserError> {
+    /// Parses a WAVE-encoded value of the given [`WasmType`] into a
+    /// corresponding [`WasmValue`].
+    pub fn parse_value<V: WasmValue>(&mut self, ty: &V::Type) -> Result<V, ParserError> {
         Ok(match ty.kind() {
-            Kind::Bool => V::make_bool(self.parse_bool()?),
-            Kind::S8 => V::make_s8(self.parse_number()?),
-            Kind::S16 => V::make_s16(self.parse_number()?),
-            Kind::S32 => V::make_s32(self.parse_number()?),
-            Kind::S64 => V::make_s64(self.parse_number()?),
-            Kind::U8 => V::make_u8(self.parse_number()?),
-            Kind::U16 => V::make_u16(self.parse_number()?),
-            Kind::U32 => V::make_u32(self.parse_number()?),
-            Kind::U64 => V::make_u64(self.parse_number()?),
-            Kind::Float32 => V::make_float32(self.parse_number()?),
-            Kind::Float64 => V::make_float64(self.parse_number()?),
-            Kind::Char => V::make_char(self.parse_char()?),
-            Kind::String => V::make_string(self.parse_string()?),
-            Kind::List => self.parse_list(ty)?,
-            Kind::Record => self.parse_record(ty)?,
-            Kind::Tuple => self.parse_tuple(ty)?,
-            Kind::Variant => self.parse_variant(ty)?,
-            Kind::Enum => self.parse_enum(ty)?,
-            Kind::Option => self.parse_option(ty)?,
-            Kind::Result => self.parse_result(ty)?,
-            Kind::Flags => self.parse_flags(ty)?,
-            Kind::Unsupported => return Err(ParserError::Unsupported("unsupported type".into())),
+            WasmTypeKind::Bool => V::make_bool(self.parse_bool()?),
+            WasmTypeKind::S8 => V::make_s8(self.parse_number()?),
+            WasmTypeKind::S16 => V::make_s16(self.parse_number()?),
+            WasmTypeKind::S32 => V::make_s32(self.parse_number()?),
+            WasmTypeKind::S64 => V::make_s64(self.parse_number()?),
+            WasmTypeKind::U8 => V::make_u8(self.parse_number()?),
+            WasmTypeKind::U16 => V::make_u16(self.parse_number()?),
+            WasmTypeKind::U32 => V::make_u32(self.parse_number()?),
+            WasmTypeKind::U64 => V::make_u64(self.parse_number()?),
+            WasmTypeKind::Float32 => V::make_float32(self.parse_number()?),
+            WasmTypeKind::Float64 => V::make_float64(self.parse_number()?),
+            WasmTypeKind::Char => V::make_char(self.parse_char()?),
+            WasmTypeKind::String => V::make_string(self.parse_string()?),
+            WasmTypeKind::List => self.parse_list(ty)?,
+            WasmTypeKind::Record => self.parse_record(ty)?,
+            WasmTypeKind::Tuple => self.parse_tuple(ty)?,
+            WasmTypeKind::Variant => self.parse_variant(ty)?,
+            WasmTypeKind::Enum => self.parse_enum(ty)?,
+            WasmTypeKind::Option => self.parse_option(ty)?,
+            WasmTypeKind::Result => self.parse_result(ty)?,
+            WasmTypeKind::Flags => self.parse_flags(ty)?,
+            WasmTypeKind::Unsupported => {
+                return Err(ParserError::Unsupported("unsupported type".into()))
+            }
         })
     }
 
@@ -148,7 +150,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn parse_list<V: Val>(&mut self, ty: &V::Type) -> Result<V, ParserError> {
+    fn parse_list<V: WasmValue>(&mut self, ty: &V::Type) -> Result<V, ParserError> {
         self.expect(Token::LSquare)?;
 
         let mut elements = vec![];
@@ -164,7 +166,7 @@ impl<'a> Parser<'a> {
         V::make_list(ty, elements).map_err(ParserError::make_value)
     }
 
-    fn parse_record<V: Val>(&mut self, ty: &V::Type) -> Result<V, ParserError> {
+    fn parse_record<V: WasmValue>(&mut self, ty: &V::Type) -> Result<V, ParserError> {
         self.expect(Token::LCurly)?;
 
         let field_types = ty
@@ -197,7 +199,7 @@ impl<'a> Parser<'a> {
             .map(|((name, (_, ty)), maybe_val)| {
                 let val = match maybe_val {
                     Some(val) => val,
-                    None if ty.kind() == Kind::Option => {
+                    None if ty.kind() == WasmTypeKind::Option => {
                         V::make_option(ty, None).map_err(ParserError::make_value)?
                     }
                     None => return Err(ParserError::RecordFieldMissing(name.to_string())),
@@ -208,7 +210,7 @@ impl<'a> Parser<'a> {
         V::make_record(ty, fields).map_err(ParserError::make_value)
     }
 
-    fn parse_tuple<V: Val>(&mut self, ty: &V::Type) -> Result<V, ParserError> {
+    fn parse_tuple<V: WasmValue>(&mut self, ty: &V::Type) -> Result<V, ParserError> {
         self.expect(Token::LParen)?;
 
         let types = ty.tuple_element_types();
@@ -227,7 +229,7 @@ impl<'a> Parser<'a> {
         V::make_tuple(ty, values).map_err(ParserError::make_value)
     }
 
-    fn parse_variant<V: Val>(&mut self, ty: &V::Type) -> Result<V, ParserError> {
+    fn parse_variant<V: WasmValue>(&mut self, ty: &V::Type) -> Result<V, ParserError> {
         let name = self.parse_name()?;
         let (case_name, case_ty) = ty
             .variant_cases()
@@ -247,12 +249,12 @@ impl<'a> Parser<'a> {
         .map_err(ParserError::make_value)
     }
 
-    fn parse_enum<V: Val>(&mut self, ty: &V::Type) -> Result<V, ParserError> {
+    fn parse_enum<V: WasmValue>(&mut self, ty: &V::Type) -> Result<V, ParserError> {
         let name = self.parse_name()?;
         V::make_enum(ty, name).map_err(ParserError::make_value)
     }
 
-    fn parse_option<V: Val>(&mut self, ty: &V::Type) -> Result<V, ParserError> {
+    fn parse_option<V: WasmValue>(&mut self, ty: &V::Type) -> Result<V, ParserError> {
         let (token, _) =
             self.peek_next_non_whitespace()?
                 .ok_or_else(|| ParserError::UnexpectedToken {
@@ -274,15 +276,15 @@ impl<'a> Parser<'a> {
             }
         } else {
             // Flattened `some` value
-            if some_ty.kind() == Kind::Option {
-                return Err(ParserError::InvalidFlattening(Kind::Result));
+            if some_ty.kind() == WasmTypeKind::Option {
+                return Err(ParserError::InvalidFlattening(WasmTypeKind::Result));
             }
             Some(self.parse_value(&some_ty)?)
         };
         V::make_option(ty, val).map_err(ParserError::make_value)
     }
 
-    fn parse_result<V: Val>(&mut self, ty: &V::Type) -> Result<V, ParserError> {
+    fn parse_result<V: WasmValue>(&mut self, ty: &V::Type) -> Result<V, ParserError> {
         let (token, _) =
             self.peek_next_non_whitespace()?
                 .ok_or_else(|| ParserError::UnexpectedToken {
@@ -306,8 +308,8 @@ impl<'a> Parser<'a> {
             (val, is_ok)
         } else if let Some(ty) = ok_ty {
             // Flattened `ok` value
-            if ty.kind() == Kind::Result {
-                return Err(ParserError::InvalidFlattening(Kind::Result));
+            if ty.kind() == WasmTypeKind::Result {
+                return Err(ParserError::InvalidFlattening(WasmTypeKind::Result));
             }
             let val = self.parse_value(&ty)?;
             (Some(val), true)
@@ -321,7 +323,7 @@ impl<'a> Parser<'a> {
         V::make_result(ty, if is_ok { Ok(val) } else { Err(val) }).map_err(ParserError::make_value)
     }
 
-    fn parse_flags<V: Val>(&mut self, ty: &V::Type) -> Result<V, ParserError> {
+    fn parse_flags<V: WasmValue>(&mut self, ty: &V::Type) -> Result<V, ParserError> {
         self.expect(Token::LCurly)?;
         let names: HashSet<_> = ty.flags_names().collect();
         let mut flags = vec![];
@@ -442,7 +444,7 @@ impl<'a> Parser<'a> {
         Ok(self.tokens.get_span(span))
     }
 
-    fn parse_maybe_payload<V: Val>(
+    fn parse_maybe_payload<V: WasmValue>(
         &mut self,
         ty: Option<&V::Type>,
     ) -> Result<Option<V>, ParserError> {
@@ -468,11 +470,11 @@ pub enum ParserError {
     InvalidEscape(String),
     /// Invalid `option` or `result` flattening
     #[error("cannot flatten nested {0:?}s")]
-    InvalidFlattening(Kind),
+    InvalidFlattening(WasmTypeKind),
     /// Lexing (tokenizing) error
     #[error("invalid token: {0}")]
     Lex(#[from] crate::lex::LexError),
-    /// Error returned by a [`Val`]`::make_*` method
+    /// Error returned by a [`WasmValue`]`::make_*` method
     #[error("error constructing value: {0}")]
     MakeValueError(String),
     /// Invalid integer encoding
@@ -506,7 +508,7 @@ pub enum ParserError {
         /// Got token type
         got: Option<Token>,
     },
-    /// Unsupported type (e.g. for a particular [`Val`] impl)
+    /// Unsupported type (e.g. for a particular [`WasmValue`] impl)
     #[error("unsupported type {0}")]
     Unsupported(String),
 }
@@ -576,7 +578,7 @@ mod tests {
         );
     }
 
-    fn parse_unwrap<V: Val>(input: &str, ty: V::Type) -> V {
+    fn parse_unwrap<V: WasmValue>(input: &str, ty: V::Type) -> V {
         Parser::new(input)
             .parse_value(&ty)
             .unwrap_or_else(|err| panic!("error decoding {input:?}: {err}"))

@@ -16,11 +16,11 @@ pub mod value;
 pub mod writer;
 
 use parser::Parser;
-pub use ty::{Kind, Type};
-pub use val::Val;
+pub use ty::{WasmType, WasmTypeKind};
+pub use val::WasmValue;
 use writer::Writer;
 
-/// Parses a [`Val`] from the given WAVE-encoded string.
+/// Parses a [`WasmValue`] from the given WAVE-encoded string.
 /// ```
 /// use wasmtime::component::{Type, Val};
 /// # fn main() -> Result<(), wasm_wave::parser::ParserError> {
@@ -29,11 +29,11 @@ use writer::Writer;
 /// # Ok(())
 /// # }
 /// ```
-pub fn from_str<V: Val>(ty: &V::Type, s: &str) -> Result<V, parser::ParserError> {
+pub fn from_str<V: WasmValue>(ty: &V::Type, s: &str) -> Result<V, parser::ParserError> {
     Parser::new(s).parse_value(ty)
 }
 
-/// WAVE-encodes a [`Val`] into a string.
+/// WAVE-encodes a [`WasmValue`] into a string.
 /// ```
 /// use wasmtime::component::Val;
 /// # fn main() -> Result<(), wasm_wave::writer::WriterError> {
@@ -41,7 +41,7 @@ pub fn from_str<V: Val>(ty: &V::Type, s: &str) -> Result<V, parser::ParserError>
 /// assert_eq!(wave_str, "'👋'");
 /// # Ok(())
 /// # }
-pub fn to_string(val: &impl Val) -> Result<String, writer::WriterError> {
+pub fn to_string(val: &impl WasmValue) -> Result<String, writer::WriterError> {
     let mut buf = vec![];
     Writer::new(&mut buf).write_value(val)?;
     Ok(String::from_utf8(buf).unwrap_or_else(|err| panic!("invalid UTF-8: {err:?}")))

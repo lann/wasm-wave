@@ -1,14 +1,15 @@
 use std::{borrow::Cow, fmt::Display};
 
-/// The Val trait may be implemented to represent values to be
-/// (de)serialized with WAVE, notably [`wasmtime::component::Val`].
+/// The WasmValue trait may be implemented to represent values to be
+/// (de)serialized with WAVE, notably [`crate::value::Value`] and
+/// [`wasmtime::component::Val`].
 ///
 /// The `make_*` and `unwrap_*` methods should be called only for corresponding
-/// [`crate::ty::Kind`]s.
+/// [`crate::WasmTypeKind`]s.
 #[allow(unused_variables)]
-pub trait Val: Clone + Sized {
+pub trait WasmValue: Clone + Sized {
     /// A type representing types of these values.
-    type Type: crate::ty::Type;
+    type Type: crate::ty::WasmType;
 
     /// An associated error which can be returned from creating values.
     type Error: Display;
@@ -16,85 +17,85 @@ pub trait Val: Clone + Sized {
     /// The type of this value.
     fn ty(&self) -> Self::Type;
 
-    /// Returns a new Val of the given type.
+    /// Returns a new WasmValue of the given type.
     /// # Panics
     /// Panics if the type is not implemented (the trait default).
     fn make_bool(val: bool) -> Self {
         unimplemented!()
     }
-    /// Returns a new Val of the given type.
+    /// Returns a new WasmValue of the given type.
     /// # Panics
     /// Panics if the type is not implemented (the trait default).
     fn make_s8(val: i8) -> Self {
         unimplemented!()
     }
-    /// Returns a new Val of the given type.
+    /// Returns a new WasmValue of the given type.
     /// # Panics
     /// Panics if the type is not implemented (the trait default).
     fn make_s16(val: i16) -> Self {
         unimplemented!()
     }
-    /// Returns a new Val of the given type.
+    /// Returns a new WasmValue of the given type.
     /// # Panics
     /// Panics if the type is not implemented (the trait default).
     fn make_s32(val: i32) -> Self {
         unimplemented!()
     }
-    /// Returns a new Val of the given type.
+    /// Returns a new WasmValue of the given type.
     /// # Panics
     /// Panics if the type is not implemented (the trait default).
     fn make_s64(val: i64) -> Self {
         unimplemented!()
     }
-    /// Returns a new Val of the given type.
+    /// Returns a new WasmValue of the given type.
     /// # Panics
     /// Panics if the type is not implemented (the trait default).
     fn make_u8(val: u8) -> Self {
         unimplemented!()
     }
-    /// Returns a new Val of the given type.
+    /// Returns a new WasmValue of the given type.
     /// # Panics
     /// Panics if the type is not implemented (the trait default).
     fn make_u16(val: u16) -> Self {
         unimplemented!()
     }
-    /// Returns a new Val of the given type.
+    /// Returns a new WasmValue of the given type.
     /// # Panics
     /// Panics if the type is not implemented (the trait default).
     fn make_u32(val: u32) -> Self {
         unimplemented!()
     }
-    /// Returns a new Val of the given type.
+    /// Returns a new WasmValue of the given type.
     /// # Panics
     /// Panics if the type is not implemented (the trait default).
     fn make_u64(val: u64) -> Self {
         unimplemented!()
     }
-    /// Returns a new Val of the given type.
+    /// Returns a new WasmValue of the given type.
     /// # Panics
     /// Panics if the type is not implemented (the trait default).
     fn make_float32(val: f32) -> Self {
         unimplemented!()
     }
-    /// Returns a new Val of the given type.
+    /// Returns a new WasmValue of the given type.
     /// # Panics
     /// Panics if the type is not implemented (the trait default).
     fn make_float64(val: f64) -> Self {
         unimplemented!()
     }
-    /// Returns a new Val of the given type.
+    /// Returns a new WasmValue of the given type.
     /// # Panics
     /// Panics if the type is not implemented (the trait default).
     fn make_char(val: char) -> Self {
         unimplemented!()
     }
-    /// Returns a new Val of the given type.
+    /// Returns a new WasmValue of the given type.
     /// # Panics
     /// Panics if the type is not implemented (the trait default).
     fn make_string(val: Cow<str>) -> Self {
         unimplemented!()
     }
-    /// Returns a new Val of the given type.
+    /// Returns a new WasmValue of the given type.
     /// # Panics
     /// Panics if the type is not implemented (the trait default).
     fn make_list(
@@ -103,7 +104,7 @@ pub trait Val: Clone + Sized {
     ) -> Result<Self, Self::Error> {
         unimplemented!()
     }
-    /// Returns a new Val of the given type.
+    /// Returns a new WasmValue of the given type.
     /// # Panics
     /// Panics if the type is not implemented (the trait default).
     fn make_record<'a>(
@@ -112,7 +113,7 @@ pub trait Val: Clone + Sized {
     ) -> Result<Self, Self::Error> {
         unimplemented!()
     }
-    /// Returns a new Val of the given type.
+    /// Returns a new WasmValue of the given type.
     /// # Panics
     /// Panics if the type is not implemented (the trait default).
     fn make_tuple(
@@ -121,25 +122,25 @@ pub trait Val: Clone + Sized {
     ) -> Result<Self, Self::Error> {
         unimplemented!()
     }
-    /// Returns a new Val of the given type.
+    /// Returns a new WasmValue of the given type.
     /// # Panics
     /// Panics if the type is not implemented (the trait default).
     fn make_variant(ty: &Self::Type, case: &str, val: Option<Self>) -> Result<Self, Self::Error> {
         unimplemented!()
     }
-    /// Returns a new Val of the given type.
+    /// Returns a new WasmValue of the given type.
     /// # Panics
     /// Panics if the type is not implemented (the trait default).
     fn make_enum(ty: &Self::Type, case: &str) -> Result<Self, Self::Error> {
         unimplemented!()
     }
-    /// Returns a new Val of the given type.
+    /// Returns a new WasmValue of the given type.
     /// # Panics
     /// Panics if the type is not implemented (the trait default).
     fn make_option(ty: &Self::Type, val: Option<Self>) -> Result<Self, Self::Error> {
         unimplemented!()
     }
-    /// Returns a new Val of the given type.
+    /// Returns a new WasmValue of the given type.
     /// # Panics
     /// Panics if the type is not implemented (the trait default).
     fn make_result(
@@ -148,7 +149,7 @@ pub trait Val: Clone + Sized {
     ) -> Result<Self, Self::Error> {
         unimplemented!()
     }
-    /// Returns a new Val of the given type.
+    /// Returns a new WasmValue of the given type.
     /// # Panics
     /// Panics if the type is not implemented (the trait default).
     fn make_flags<'a>(
@@ -158,79 +159,79 @@ pub trait Val: Clone + Sized {
         unimplemented!()
     }
 
-    /// Returns the underlying value of the Val, panicing if it's the wrong type.
+    /// Returns the underlying value of the WasmValue, panicing if it's the wrong type.
     /// # Panics
     /// Panics if `self` is not of the right type.
     fn unwrap_bool(&self) -> bool {
         unimplemented!()
     }
-    /// Returns the underlying value of the Val, panicing if it's the wrong type.
+    /// Returns the underlying value of the WasmValue, panicing if it's the wrong type.
     /// # Panics
     /// Panics if `self` is not of the right type.
     fn unwrap_s8(&self) -> i8 {
         unimplemented!()
     }
-    /// Returns the underlying value of the Val, panicing if it's the wrong type.
+    /// Returns the underlying value of the WasmValue, panicing if it's the wrong type.
     /// # Panics
     /// Panics if `self` is not of the right type.
     fn unwrap_s16(&self) -> i16 {
         unimplemented!()
     }
-    /// Returns the underlying value of the Val, panicing if it's the wrong type.
+    /// Returns the underlying value of the WasmValue, panicing if it's the wrong type.
     /// # Panics
     /// Panics if `self` is not of the right type.
     fn unwrap_s32(&self) -> i32 {
         unimplemented!()
     }
-    /// Returns the underlying value of the Val, panicing if it's the wrong type.
+    /// Returns the underlying value of the WasmValue, panicing if it's the wrong type.
     /// # Panics
     /// Panics if `self` is not of the right type.
     fn unwrap_s64(&self) -> i64 {
         unimplemented!()
     }
-    /// Returns the underlying value of the Val, panicing if it's the wrong type.
+    /// Returns the underlying value of the WasmValue, panicing if it's the wrong type.
     /// # Panics
     /// Panics if `self` is not of the right type.
     fn unwrap_u8(&self) -> u8 {
         unimplemented!()
     }
-    /// Returns the underlying value of the Val, panicing if it's the wrong type.
+    /// Returns the underlying value of the WasmValue, panicing if it's the wrong type.
     /// # Panics
     /// Panics if `self` is not of the right type.
     fn unwrap_u16(&self) -> u16 {
         unimplemented!()
     }
-    /// Returns the underlying value of the Val, panicing if it's the wrong type.
+    /// Returns the underlying value of the WasmValue, panicing if it's the wrong type.
     /// # Panics
     /// Panics if `self` is not of the right type.
     fn unwrap_u32(&self) -> u32 {
         unimplemented!()
     }
-    /// Returns the underlying value of the Val, panicing if it's the wrong type.
+    /// Returns the underlying value of the WasmValue, panicing if it's the wrong type.
     /// # Panics
     /// Panics if `self` is not of the right type.
     fn unwrap_u64(&self) -> u64 {
         unimplemented!()
     }
-    /// Returns the underlying value of the Val, panicing if it's the wrong type.
+    /// Returns the underlying value of the WasmValue, panicing if it's the wrong type.
     /// # Panics
     /// Panics if `self` is not of the right type.
     fn unwrap_float32(&self) -> f32 {
         unimplemented!()
     }
-    /// Returns the underlying value of the Val, panicing if it's the wrong type.
+    /// Returns the underlying value of the WasmValue, panicing if it's the wrong type.
     /// # Panics
     /// Panics if `self` is not of the right type.
     fn unwrap_float64(&self) -> f64 {
         unimplemented!()
     }
-    /// Returns the underlying value of the Val, panicing if it's the wrong type.
+    /// Returns the underlying value of the WasmValue, panicing if it's the wrong type.
     /// # Panics
     /// Panics if `self` is not of the right type.
     fn unwrap_char(&self) -> char {
         unimplemented!()
     }
-    /// Returns the underlying value of the Val, panicing if it's the wrong type.
+    /// Returns the underlying value of the WasmValue, panicing if it's the wrong type.
     /// # Panics
     /// Panics if `self` is not of the right type.
     fn unwrap_string(&self) -> Cow<str> {
@@ -254,7 +255,7 @@ pub trait Val: Clone + Sized {
     fn unwrap_tuple(&self) -> Box<dyn Iterator<Item = Cow<Self>> + '_> {
         unimplemented!()
     }
-    /// Returns the variant case name and optional payload Val of the variant.
+    /// Returns the variant case name and optional payload WasmValue of the variant.
     /// # Panics
     /// Panics if `self` is not of the right type.
     fn unwrap_variant(&self) -> (Cow<str>, Option<Cow<Self>>) {
@@ -266,19 +267,19 @@ pub trait Val: Clone + Sized {
     fn unwrap_enum(&self) -> Cow<str> {
         unimplemented!()
     }
-    /// Returns the optional Val.
+    /// Returns the optional WasmValue.
     /// # Panics
     /// Panics if `self` is not of the right type.
     fn unwrap_option(&self) -> Option<Cow<Self>> {
         unimplemented!()
     }
-    /// Returns Ok(_) or Err(_) with the optional payload Val.
+    /// Returns Ok(_) or Err(_) with the optional payload WasmValue.
     /// # Panics
     /// Panics if `self` is not of the right type.
     fn unwrap_result(&self) -> Result<Option<Cow<Self>>, Option<Cow<Self>>> {
         unimplemented!()
     }
-    /// Returns an iterator of the names of the flags Val.
+    /// Returns an iterator of the names of the flags WasmValue.
     /// # Panics
     /// Panics if `self` is not of the right type.
     fn unwrap_flags(&self) -> Box<dyn Iterator<Item = Cow<str>> + '_> {

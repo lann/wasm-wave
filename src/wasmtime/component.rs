@@ -1,37 +1,37 @@
 use std::borrow::Cow;
 
 use crate::{
-    ty::{maybe_unwrap, Kind},
+    ty::{maybe_unwrap, WasmTypeKind},
     val::unwrap_val,
-    Type, Val,
+    WasmType, WasmValue,
 };
 
-impl Type for wasmtime::component::Type {
-    fn kind(&self) -> Kind {
+impl WasmType for wasmtime::component::Type {
+    fn kind(&self) -> WasmTypeKind {
         match self {
-            Self::Bool => Kind::Bool,
-            Self::S8 => Kind::S8,
-            Self::U8 => Kind::U8,
-            Self::S16 => Kind::S16,
-            Self::U16 => Kind::U16,
-            Self::S32 => Kind::S32,
-            Self::U32 => Kind::U32,
-            Self::S64 => Kind::S64,
-            Self::U64 => Kind::U64,
-            Self::Float32 => Kind::Float32,
-            Self::Float64 => Kind::Float64,
-            Self::Char => Kind::Char,
-            Self::String => Kind::String,
-            Self::List(_) => Kind::List,
-            Self::Record(_) => Kind::Record,
-            Self::Tuple(_) => Kind::Tuple,
-            Self::Variant(_) => Kind::Variant,
-            Self::Enum(_) => Kind::Enum,
-            Self::Option(_) => Kind::Option,
-            Self::Result(_) => Kind::Result,
-            Self::Flags(_) => Kind::Flags,
+            Self::Bool => WasmTypeKind::Bool,
+            Self::S8 => WasmTypeKind::S8,
+            Self::U8 => WasmTypeKind::U8,
+            Self::S16 => WasmTypeKind::S16,
+            Self::U16 => WasmTypeKind::U16,
+            Self::S32 => WasmTypeKind::S32,
+            Self::U32 => WasmTypeKind::U32,
+            Self::S64 => WasmTypeKind::S64,
+            Self::U64 => WasmTypeKind::U64,
+            Self::Float32 => WasmTypeKind::Float32,
+            Self::Float64 => WasmTypeKind::Float64,
+            Self::Char => WasmTypeKind::Char,
+            Self::String => WasmTypeKind::String,
+            Self::List(_) => WasmTypeKind::List,
+            Self::Record(_) => WasmTypeKind::Record,
+            Self::Tuple(_) => WasmTypeKind::Tuple,
+            Self::Variant(_) => WasmTypeKind::Variant,
+            Self::Enum(_) => WasmTypeKind::Enum,
+            Self::Option(_) => WasmTypeKind::Option,
+            Self::Result(_) => WasmTypeKind::Result,
+            Self::Flags(_) => WasmTypeKind::Flags,
 
-            Self::Own(_) | Self::Borrow(_) => Kind::Unsupported,
+            Self::Own(_) | Self::Borrow(_) => WasmTypeKind::Unsupported,
         }
     }
 
@@ -98,7 +98,7 @@ macro_rules! impl_primitives {
     };
 }
 
-impl Val for wasmtime::component::Val {
+impl WasmValue for wasmtime::component::Val {
     type Type = wasmtime::component::Type;
     type Error = wasmtime::Error;
 
@@ -249,10 +249,10 @@ mod tests {
 
     #[test]
     fn test_round_trip_floats() {
-        use wasmtime::component::{Val, Type};
         use std::fmt::Debug;
+        use wasmtime::component::{Type, Val};
 
-        fn round_trip<V: crate::Val + PartialEq + Debug>(ty: &V::Type, val: &V) {
+        fn round_trip<V: crate::WasmValue + PartialEq + Debug>(ty: &V::Type, val: &V) {
             let val_str = crate::to_string(val).unwrap();
             let result: V = crate::from_str::<V>(ty, &val_str).unwrap();
             assert_eq!(val, &result);

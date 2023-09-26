@@ -1,11 +1,11 @@
 use std::{borrow::Cow, fmt::Debug};
 
-/// The kind of a [`Type`]. These correspond to the value types defined by the
+/// The kind of a [`WasmType`]. These correspond to the value types defined by the
 /// [Component Model design](https://github.com/WebAssembly/component-model/blob/673d5c43c3cc0f4aeb8996a5c0931af623f16808/design/mvp/WIT.md).
 #[derive(Clone, Copy, Debug, PartialEq)]
 #[allow(missing_docs)]
 #[non_exhaustive]
-pub enum Kind {
+pub enum WasmTypeKind {
     Bool,
     S8,
     S16,
@@ -31,45 +31,46 @@ pub enum Kind {
     Unsupported,
 }
 
-impl std::fmt::Display for Kind {
+impl std::fmt::Display for WasmTypeKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(match self {
-            Kind::Bool => "bool",
-            Kind::S8 => "s8",
-            Kind::S16 => "s16",
-            Kind::S32 => "s32",
-            Kind::S64 => "s64",
-            Kind::U8 => "u8",
-            Kind::U16 => "u16",
-            Kind::U32 => "u32",
-            Kind::U64 => "u64",
-            Kind::Float32 => "float32",
-            Kind::Float64 => "float64",
-            Kind::Char => "char",
-            Kind::String => "string",
-            Kind::List => "list",
-            Kind::Record => "record",
-            Kind::Tuple => "tuple",
-            Kind::Variant => "variant",
-            Kind::Enum => "enum",
-            Kind::Option => "option",
-            Kind::Result => "result",
-            Kind::Flags => "flags",
-            Kind::Unsupported => "<<UNSUPPORTED>>",
+            WasmTypeKind::Bool => "bool",
+            WasmTypeKind::S8 => "s8",
+            WasmTypeKind::S16 => "s16",
+            WasmTypeKind::S32 => "s32",
+            WasmTypeKind::S64 => "s64",
+            WasmTypeKind::U8 => "u8",
+            WasmTypeKind::U16 => "u16",
+            WasmTypeKind::U32 => "u32",
+            WasmTypeKind::U64 => "u64",
+            WasmTypeKind::Float32 => "float32",
+            WasmTypeKind::Float64 => "float64",
+            WasmTypeKind::Char => "char",
+            WasmTypeKind::String => "string",
+            WasmTypeKind::List => "list",
+            WasmTypeKind::Record => "record",
+            WasmTypeKind::Tuple => "tuple",
+            WasmTypeKind::Variant => "variant",
+            WasmTypeKind::Enum => "enum",
+            WasmTypeKind::Option => "option",
+            WasmTypeKind::Result => "result",
+            WasmTypeKind::Flags => "flags",
+            WasmTypeKind::Unsupported => "<<UNSUPPORTED>>",
         })
     }
 }
 
-/// The Type trait may be implemented to represent types to be
-/// (de)serialized with WAVE, notably [`wasmtime::component::Type`].
+/// The WasmType trait may be implemented to represent types to be
+/// (de)serialized with WAVE, notably [`crate::value::Type`] and
+/// [`wasmtime::component::Type`].
 ///
 /// The `Self`-returning methods should be called only for corresponding
-/// [`Kind`]s.
-pub trait Type: Clone + Sized {
-    /// Returns the [`Kind`] of this Type.
-    fn kind(&self) -> Kind;
+/// [`WasmTypeKind`]s.
+pub trait WasmType: Clone + Sized {
+    /// Returns the [`WasmTypeKind`] of this type.
+    fn kind(&self) -> WasmTypeKind;
 
-    /// Returns the list element Type or None if `self` is not a list type.
+    /// Returns the list element type or `None` if `self` is not a list type.
     /// # Panics
     /// Panics if the type is not implemented (the trait default).
     fn list_element_type(&self) -> Option<Self> {
@@ -103,13 +104,13 @@ pub trait Type: Clone + Sized {
     fn enum_cases(&self) -> Box<dyn Iterator<Item = Cow<str>> + '_> {
         unimplemented!()
     }
-    /// Returns the option's "some" Type or None if `self` is not an option type.
+    /// Returns the option's "some" type or `None` if `self` is not an option type.
     /// # Panics
     /// Panics if the type is not implemented (the trait default).
     fn option_some_type(&self) -> Option<Self> {
         unimplemented!()
     }
-    /// Returns the result's optional "ok" and "err" Types or None if `self`
+    /// Returns the result's optional "ok" and "err" Types or `None` if `self`
     /// is not a result type.
     /// # Panics
     /// Panics if the type is not implemented (the trait default).

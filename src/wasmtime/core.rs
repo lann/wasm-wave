@@ -1,17 +1,17 @@
 use std::borrow::Cow;
 
-use crate::{ty::Kind, val::unwrap_val, Type, Val};
+use crate::{ty::WasmTypeKind, val::unwrap_val, WasmType, WasmValue};
 
-impl Type for wasmtime::ValType {
-    fn kind(&self) -> Kind {
+impl WasmType for wasmtime::ValType {
+    fn kind(&self) -> WasmTypeKind {
         match self {
-            Self::I32 => Kind::S32,
-            Self::I64 => Kind::S64,
-            Self::F32 => Kind::Float32,
-            Self::F64 => Kind::Float64,
-            Self::V128 => Kind::Tuple,
+            Self::I32 => WasmTypeKind::S32,
+            Self::I64 => WasmTypeKind::S64,
+            Self::F32 => WasmTypeKind::Float32,
+            Self::F64 => WasmTypeKind::Float64,
+            Self::V128 => WasmTypeKind::Tuple,
 
-            Self::FuncRef | Self::ExternRef => Kind::Unsupported,
+            Self::FuncRef | Self::ExternRef => WasmTypeKind::Unsupported,
         }
     }
 
@@ -23,7 +23,7 @@ impl Type for wasmtime::ValType {
     }
 }
 
-impl Val for wasmtime::Val {
+impl WasmValue for wasmtime::Val {
     type Type = wasmtime::ValType;
     type Error = &'static str;
 
