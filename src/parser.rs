@@ -459,6 +459,21 @@ impl<'a> Parser<'a> {
     }
 }
 
+impl<'a> From<Tokenizer<'a>> for Parser<'a> {
+    fn from(tokens: Tokenizer<'a>) -> Self {
+        Self {
+            tokens,
+            peeked: None,
+        }
+    }
+}
+
+impl<'a> From<Parser<'a>> for Tokenizer<'a> {
+    fn from(parser: Parser<'a>) -> Self {
+        parser.tokens
+    }
+}
+
 /// A WAVE Parser error.
 #[derive(Debug, thiserror::Error)]
 pub enum ParserError {
