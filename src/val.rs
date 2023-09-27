@@ -1,11 +1,11 @@
 use std::{borrow::Cow, fmt::Display};
 
 /// The WasmValue trait may be implemented to represent values to be
-/// (de)serialized with WAVE, notably [`crate::value::Value`] and
-/// [`wasmtime::component::Val`].
+/// (de)serialized with WAVE, notably [`value::Value`](crate::value::Value)
+/// and [`wasmtime::component::Val`].
 ///
 /// The `make_*` and `unwrap_*` methods should be called only for corresponding
-/// [`crate::WasmTypeKind`]s.
+/// [`WasmTypeKind`](crate::WasmTypeKind)s.
 #[allow(unused_variables)]
 pub trait WasmValue: Clone + Sized {
     /// A type representing types of these values.
