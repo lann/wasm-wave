@@ -35,6 +35,17 @@ impl Type {
     pub const CHAR: Self = Self::Simple(WasmTypeKind::Char);
     pub const STRING: Self = Self::Simple(WasmTypeKind::String);
 
+    /// Returns the simple type of the given `kind`. Returns None if the kind
+    /// represents a parameterized type.
+    pub fn simple(kind: WasmTypeKind) -> Option<Self> {
+        use WasmTypeKind::*;
+        match kind {
+            Bool | S8 | S16 | S32 | S64 | U8 | U16 | U32 | U64 | Float32 | Float64 | Char
+            | String => Some(Self::Simple(kind)),
+            _ => None,
+        }
+    }
+
     /// Returns a list type with the given element type.
     pub fn list(element_type: impl Into<Box<Self>>) -> Self {
         let element = element_type.into();
@@ -112,6 +123,12 @@ impl Type {
             return None;
         }
         Some(Self::Flags(FlagsType { flags }))
+    }
+
+    /// Returns a [`Type`] matching the given [`WasmType`]. Returns None if the
+    /// given type is unsupported or otherwise invalid.
+    pub fn from_wasm_type(ty: &impl WasmType) -> Option<Self> {
+        super::convert::from_wasm_type(ty)
     }
 }
 

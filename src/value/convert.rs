@@ -1,6 +1,45 @@
-use crate::{ty::WasmTypeKind, WasmValue};
+use crate::{ty::WasmTypeKind, WasmType, WasmValue};
 
 use super::{Type, Value};
+
+pub fn from_wasm_type(ty: &impl WasmType) -> Option<Type> {
+    if let Some(ty) = Type::simple(ty.kind()) {
+        return Some(ty);
+    }
+    Some(match ty.kind() {
+        WasmTypeKind::List => Type::list(from_wasm_type(&ty.list_element_type()?)?),
+        WasmTypeKind::Record => Type::record(
+            ty.record_fields()
+                .map(|(name, ty)| Some((name, from_wasm_type(&ty)?)))
+                .collect::<Option<Vec<_>>>()?,
+        )?,
+        WasmTypeKind::Tuple => Type::tuple(
+            ty.tuple_element_types()
+                .map(|ty| from_wasm_type(&ty))
+                .collect::<Option<Vec<_>>>()?,
+        )?,
+        WasmTypeKind::Variant => Type::variant(
+            ty.variant_cases()
+                .map(|(name, payload)| Some((name, from_optional_wasm_type(payload)?)))
+                .collect::<Option<Vec<_>>>()?,
+        )?,
+        WasmTypeKind::Enum => Type::enum_ty(ty.enum_cases())?,
+        WasmTypeKind::Option => Type::option(from_wasm_type(&ty.option_some_type()?)?),
+        WasmTypeKind::Result => {
+            let (ok, err) = ty.result_types()?;
+            Type::result(from_optional_wasm_type(ok)?, from_optional_wasm_type(err)?)
+        }
+        WasmTypeKind::Flags => Type::flags(ty.flags_names())?,
+        _ => return None,
+    })
+}
+
+fn from_optional_wasm_type(ty: Option<impl WasmType>) -> Option<Option<Type>> {
+    Some(match ty {
+        Some(ty) => Some(from_wasm_type(&ty)?),
+        None => None,
+    })
+}
 
 trait ValueTyped {
     fn value_type() -> Type;
@@ -167,10 +206,31 @@ impl_tuple!(
 
 #[cfg(test)]
 mod tests {
-    use crate::value::Value;
+    use crate::value::{Type, Value};
 
     #[test]
-    fn conversions() {
+    fn type_conversion_round_trips() {
+        for ty in [
+            Type::BOOL,
+            Type::U8,
+            Type::FLOAT32,
+            Type::STRING,
+            Type::list(Type::BOOL),
+            Type::record([("a", Type::BOOL)]).unwrap(),
+            Type::tuple([Type::BOOL]).unwrap(),
+            Type::variant([("a", None), ("b", Some(Type::BOOL))]).unwrap(),
+            Type::enum_ty(["north", "south"]).unwrap(),
+            Type::option(Type::BOOL),
+            Type::result(Some(Type::BOOL), None),
+            Type::flags(["read", "write"]).unwrap(),
+        ] {
+            let got = Type::from_wasm_type(&ty).unwrap();
+            assert_eq!(got, ty);
+        }
+    }
+
+    #[test]
+    fn value_conversions() {
         for (val, expect) in [
             (1u8.into(), "1"),
             ((-123i8).into(), "-123"),

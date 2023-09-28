@@ -1,4 +1,4 @@
-use std::{ops::Range, str::Chars};
+use std::{ops::Range, slice::SliceIndex, str::Chars};
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Token {
@@ -32,12 +32,16 @@ impl<'a> Tokenizer<'a> {
         Self { input, pos: 0 }
     }
 
-    pub fn get_span(&self, span: Span) -> &str {
+    pub fn get_span(&self, span: impl SliceIndex<str, Output = str>) -> &str {
         self.input.get(span).unwrap()
     }
 
     pub fn pos(&self) -> usize {
         self.pos
+    }
+
+    pub fn ended(&self) -> bool {
+        self.pos == self.input.len()
     }
 
     pub fn next_token(&mut self) -> Result<Option<Token>, LexError> {

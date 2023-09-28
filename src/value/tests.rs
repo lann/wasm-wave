@@ -3,7 +3,7 @@ use crate::WasmValue;
 use super::{Type, Value};
 
 #[test]
-fn basic_value_round_trips() {
+fn simple_value_round_trips() {
     for val in [
         Value::Bool(true),
         Value::U8(u8::MAX),

@@ -11,7 +11,8 @@ use std::{
 use indexmap::IndexMap;
 
 use crate::{
-    lex::Span,
+    completion::Completions,
+    lex::{LexError, Span},
     lex::{Token, Tokenizer},
     ty::WasmTypeKind,
     WasmType, WasmValue,
@@ -21,6 +22,7 @@ use crate::{
 pub struct Parser<'a> {
     tokens: Tokenizer<'a>,
     peeked: Option<(Token, Span)>,
+    completion: bool,
 }
 
 impl<'a> Parser<'a> {
@@ -29,12 +31,26 @@ impl<'a> Parser<'a> {
         Self {
             tokens: Tokenizer::new(input),
             peeked: None,
+            completion: false,
         }
+    }
+
+    /// Enable or disables the completions API, disabled by default. The
+    /// completion API is available from [`ParserError::UnexpectedEnd`]
+    /// errors returned from parsing.
+    pub fn completion(&mut self, enabled: bool) {
+        self.completion = enabled;
     }
 
     /// Parses a WAVE-encoded value of the given [`WasmType`] into a
     /// corresponding [`WasmValue`].
     pub fn parse_value<V: WasmValue>(&mut self, ty: &V::Type) -> Result<V, ParserError> {
+        let start = self.pos();
+        self.parse_value_inner(ty)
+            .map_err(|err| self.handle_unexpected_end_errors(err, start, ty))
+    }
+
+    fn parse_value_inner<V: WasmValue>(&mut self, ty: &V::Type) -> Result<V, ParserError> {
         Ok(match ty.kind() {
             WasmTypeKind::Bool => V::make_bool(self.parse_bool()?),
             WasmTypeKind::S8 => V::make_s8(self.parse_number()?),
@@ -104,6 +120,15 @@ impl<'a> Parser<'a> {
             }
         }
         Ok(values)
+    }
+
+    /// Returns the current byte position in the input.
+    pub fn pos(&self) -> usize {
+        if let Some((_, Span { start, .. })) = self.peeked {
+            start
+        } else {
+            self.tokens.pos()
+        }
     }
 
     fn parse_bool(&mut self) -> Result<bool, ParserError> {
@@ -500,6 +525,29 @@ impl<'a> Parser<'a> {
             Ok(None)
         }
     }
+
+    fn handle_unexpected_end_errors(
+        &self,
+        err: ParserError,
+        start: usize,
+        ty: &impl WasmType,
+    ) -> ParserError {
+        // Convert several errors to `UnexpectedEnd` with optional Completion
+        match err {
+            ParserError::Lex(LexError::UnexpectedEnd)
+            | ParserError::UnexpectedToken { got: None, .. }
+            | ParserError::UnexpectedEnd { completions: None } => (),
+            ParserError::UnexpectedName { .. } | ParserError::MakeValueError(_)
+                if self.tokens.ended() => {}
+            _ => return err,
+        }
+        ParserError::UnexpectedEnd {
+            completions: self.completion.then(|| {
+                let prefix = self.tokens.get_span(start..);
+                crate::completion::Completions::new(ty, prefix)
+            }),
+        }
+    }
 }
 
 impl<'a> From<Tokenizer<'a>> for Parser<'a> {
@@ -507,6 +555,7 @@ impl<'a> From<Tokenizer<'a>> for Parser<'a> {
         Self {
             tokens,
             peeked: None,
+            completion: false,
         }
     }
 }
@@ -560,6 +609,12 @@ pub enum ParserError {
         expected: Vec<String>,
         /// Got name
         got: String,
+    },
+    /// Unexpected end of input
+    #[error("unexpected end of input")]
+    UnexpectedEnd {
+        /// Completion data, if enabled
+        completions: Option<Completions>,
     },
     /// Unexpected token type
     #[error("expected {expected:?}, got {got:?}")]

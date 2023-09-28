@@ -13,6 +13,8 @@ mod lex;
 mod ty;
 mod val;
 
+/// Completion API
+pub mod completion;
 #[cfg(feature = "wasmtime")]
 /// Implementations for [`wasmtime`] types.
 pub mod wasmtime;
