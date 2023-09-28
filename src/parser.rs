@@ -63,6 +63,49 @@ impl<'a> Parser<'a> {
         })
     }
 
+    /// Parses a WAVE-encoded, parenthesized, comma-separated sequence of
+    /// values of the given `types`. Any number of option-typed values at
+    /// the end of the sequence may be omitted from the input; those will
+    /// be returned as `none` values.
+    pub fn parse_params<'ty, V: WasmValue + 'static>(
+        &mut self,
+        types: impl IntoIterator<Item = &'ty V::Type>,
+    ) -> Result<Vec<V>, ParserError> {
+        self.expect(Token::LParen)?;
+
+        let mut types = types.into_iter();
+        let mut values = Vec::with_capacity(types.size_hint().0);
+        loop {
+            if let Some((Token::RParen, _)) = self.peek_next_non_whitespace()? {
+                self.next_non_whitespace()?;
+                break;
+            }
+            let ty = types.next().ok_or_else(|| {
+                ParserError::ParseParams(format!(
+                    "too many param values; expected {}",
+                    values.len()
+                ))
+            })?;
+            values.push(self.parse_value(ty)?);
+            if let (Token::RParen, _) = self.expect_any_of(&[Token::Comma, Token::RParen])? {
+                break;
+            }
+        }
+        // Handle trailing option types
+        for ty in types {
+            if ty.kind() == WasmTypeKind::Option {
+                let none = V::make_option(ty, None).map_err(ParserError::make_value)?;
+                values.push(none);
+            } else {
+                return Err(ParserError::ParseParams(format!(
+                    "not enough param values; got {}",
+                    values.len()
+                )));
+            }
+        }
+        Ok(values)
+    }
+
     fn parse_bool(&mut self) -> Result<bool, ParserError> {
         match self.parse_name()? {
             "false" => Ok(false),
@@ -492,12 +535,15 @@ pub enum ParserError {
     /// Error returned by a [`WasmValue`]`::make_*` method
     #[error("error constructing value: {0}")]
     MakeValueError(String),
-    /// Invalid integer encoding
-    #[error("error parsing int: {0}")]
-    ParseInt(#[from] ParseIntError),
     /// Invalid float encoding
     #[error("error parsing float: {0}")]
     ParseFloat(#[from] ParseFloatError),
+    /// Invalid integer encoding
+    #[error("error parsing int: {0}")]
+    ParseInt(#[from] ParseIntError),
+    /// Invalid params encoding
+    #[error("error parsing params: {0}")]
+    ParseParams(String),
     /// Duplicate record field
     #[error("duplicate field `{0}`")]
     RecordFieldDuplicated(String),
@@ -536,6 +582,8 @@ impl ParserError {
 
 #[cfg(test)]
 mod tests {
+    use crate::value::{Type, Value};
+
     use super::*;
 
     #[test]
@@ -591,6 +639,41 @@ mod tests {
                 .unwrap_v128(),
             0x1234567890abcdef1122334455667788
         );
+    }
+
+    #[test]
+    fn parse_params_empty() {
+        let vals: Vec<Value> = Parser::new("()").parse_params([]).unwrap();
+        assert!(vals.is_empty());
+    }
+
+    #[test]
+    fn parse_params_tests() {
+        for (types, input, expected) in [
+            (vec![Type::BOOL], "(true)", "(true)"),
+            (
+                vec![Type::U8, Type::option(Type::U8), Type::option(Type::U8)],
+                "(1)",
+                "(1, none, none)",
+            ),
+            (
+                vec![Type::U8, Type::option(Type::U8), Type::option(Type::U8)],
+                "(1, 2)",
+                "(1, some(2), none)",
+            ),
+            (
+                vec![Type::U8, Type::option(Type::U8), Type::option(Type::U8)],
+                "(1, 2, 3)",
+                "(1, some(2), some(3))",
+            ),
+        ] {
+            let vals: Vec<Value> = Parser::new(input)
+                .parse_params(&types)
+                .unwrap_or_else(|err| panic!("error decoding params {input:?}: {err}"));
+            let tuple = Type::tuple(types).unwrap();
+            let tuple_str = crate::to_string(&Value::make_tuple(&tuple, vals).unwrap()).unwrap();
+            assert_eq!(tuple_str, expected, "for {input:?}");
+        }
     }
 
     fn parse_unwrap<V: WasmValue>(input: &str, ty: V::Type) -> V {
