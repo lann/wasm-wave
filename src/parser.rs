@@ -25,6 +25,11 @@ pub struct Parser<'a> {
     completion: bool,
 }
 
+pub(crate) const SOME: &str = "some";
+pub(crate) const NONE: &str = "none";
+pub(crate) const OK: &str = "ok";
+pub(crate) const ERR: &str = "err";
+
 impl<'a> Parser<'a> {
     /// Returns a new Parser for the given input.
     pub fn new(input: &'a str) -> Self {
@@ -309,12 +314,8 @@ impl<'a> Parser<'a> {
                     .collect(),
                 got: name.into(),
             })?;
-        V::make_variant(
-            ty,
-            case_name.as_ref(),
-            self.parse_maybe_payload(case_ty.as_ref())?,
-        )
-        .map_err(ParserError::make_value)
+        V::make_variant(ty, case_name.as_ref(), self.parse_maybe_payload(case_ty)?)
+            .map_err(ParserError::make_value)
     }
 
     fn parse_enum<V: WasmValue>(&mut self, ty: &V::Type) -> Result<V, ParserError> {
@@ -323,72 +324,53 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_option<V: WasmValue>(&mut self, ty: &V::Type) -> Result<V, ParserError> {
-        let (token, _) =
-            self.peek_next_non_whitespace()?
-                .ok_or_else(|| ParserError::UnexpectedToken {
-                    expected: vec![Token::Name],
-                    got: None,
-                })?;
-
         let some_ty = ty.option_some_type().unwrap();
-        let val = if token == Token::Name {
+        let peek_name = self.peek_name()?;
+        let val = if peek_name.is_some_and(|s| SOME.starts_with(s) || NONE.starts_with(s)) {
             match self.parse_name()? {
-                "some" => self.parse_maybe_payload(Some(&some_ty))?,
-                "none" => None,
+                SOME => self.parse_maybe_payload(Some(some_ty))?,
+                NONE => None,
                 other => {
                     return Err(ParserError::UnexpectedName {
-                        expected: vec!["some".into(), "none".into()],
+                        expected: vec![SOME.into(), NONE.into()],
                         got: other.into(),
                     })
                 }
             }
-        } else {
-            // Flattened `some` value
-            if some_ty.kind() == WasmTypeKind::Option {
-                return Err(ParserError::InvalidFlattening(WasmTypeKind::Result));
-            }
+        } else if flattenable(some_ty.kind()) {
             Some(self.parse_value(&some_ty)?)
+        } else {
+            return Err(ParserError::UnexpectedName {
+                expected: vec![SOME.into(), NONE.into()],
+                got: self.parse_name()?.into(),
+            });
         };
         V::make_option(ty, val).map_err(ParserError::make_value)
     }
 
     fn parse_result<V: WasmValue>(&mut self, ty: &V::Type) -> Result<V, ParserError> {
-        let (token, _) =
-            self.peek_next_non_whitespace()?
-                .ok_or_else(|| ParserError::UnexpectedToken {
-                    expected: vec![Token::Name],
-                    got: None,
-                })?;
-
         let (ok_ty, err_ty) = ty.result_types().unwrap();
-        let (val, is_ok) = if token == Token::Name {
-            let (payload_ty, is_ok) = match self.parse_name()? {
-                "ok" => (ok_ty, true),
-                "err" => (err_ty, false),
+        let peek_name = self.peek_name()?;
+        let val = if peek_name.is_some_and(|s| OK.starts_with(s) || ERR.starts_with(s)) {
+            match self.parse_name()? {
+                OK => Ok(self.parse_maybe_payload(ok_ty)?),
+                ERR => Err(self.parse_maybe_payload(err_ty)?),
                 other => {
                     return Err(ParserError::UnexpectedName {
-                        expected: vec!["ok".into(), "err".into()],
+                        expected: vec![OK.into(), ERR.into()],
                         got: other.into(),
                     })
                 }
-            };
-            let val = self.parse_maybe_payload(payload_ty.as_ref())?;
-            (val, is_ok)
-        } else if let Some(ty) = ok_ty {
-            // Flattened `ok` value
-            if ty.kind() == WasmTypeKind::Result {
-                return Err(ParserError::InvalidFlattening(WasmTypeKind::Result));
             }
-            let val = self.parse_value(&ty)?;
-            (Some(val), true)
+        } else if ok_ty.is_some() && flattenable(ok_ty.as_ref().unwrap().kind()) {
+            Ok(Some(self.parse_value(&ok_ty.unwrap())?))
         } else {
-            return Err(ParserError::UnexpectedToken {
-                expected: vec![Token::Name],
-                got: Some(token),
+            return Err(ParserError::UnexpectedName {
+                expected: vec![OK.into(), ERR.into()],
+                got: self.parse_name()?.into(),
             });
         };
-
-        V::make_result(ty, if is_ok { Ok(val) } else { Err(val) }).map_err(ParserError::make_value)
+        V::make_result(ty, val).map_err(ParserError::make_value)
     }
 
     fn parse_flags<V: WasmValue>(&mut self, ty: &V::Type) -> Result<V, ParserError> {
@@ -431,6 +413,12 @@ impl<'a> Parser<'a> {
     fn peek_next_non_whitespace(&mut self) -> Result<Option<(Token, Span)>, ParserError> {
         self.peeked = self.next_non_whitespace()?;
         Ok(self.peeked.clone())
+    }
+
+    fn peek_name(&mut self) -> Result<Option<&str>, ParserError> {
+        Ok(self
+            .peek_next_non_whitespace()?
+            .and_then(|(token, span)| (token == Token::Name).then(|| self.tokens.get_span(span))))
     }
 
     fn expect_any_of(&mut self, expected: &[Token]) -> Result<(Token, Span), ParserError> {
@@ -514,11 +502,11 @@ impl<'a> Parser<'a> {
 
     fn parse_maybe_payload<V: WasmValue>(
         &mut self,
-        ty: Option<&V::Type>,
+        ty: Option<V::Type>,
     ) -> Result<Option<V>, ParserError> {
         if let Some(ty) = ty {
             self.expect(Token::LParen)?;
-            let val = self.parse_value(ty)?;
+            let val = self.parse_value(&ty)?;
             self.expect(Token::RParen)?;
             Ok(Some(val))
         } else {
@@ -548,6 +536,11 @@ impl<'a> Parser<'a> {
             }),
         }
     }
+}
+
+pub(crate) fn flattenable(kind: WasmTypeKind) -> bool {
+    use WasmTypeKind::*;
+    !matches!(kind, Variant | Enum | Option | Result)
 }
 
 impl<'a> From<Tokenizer<'a>> for Parser<'a> {
@@ -697,6 +690,20 @@ mod tests {
     }
 
     #[test]
+    fn parse_bare_option_or_result() {
+        let ty = Type::option(Type::BOOL);
+        assert_eq!(
+            parse_value("true", &ty),
+            Value::make_option(&ty, Some(Value::Bool(true))).unwrap()
+        );
+        let ty = Type::result(Some(Type::BOOL), None);
+        assert_eq!(
+            parse_value("false", &ty),
+            Value::make_result(&ty, Ok(Some(Value::Bool(false)))).unwrap()
+        );
+    }
+
+    #[test]
     fn parse_params_empty() {
         let vals: Vec<Value> = Parser::new("()").parse_params([]).unwrap();
         assert!(vals.is_empty());
@@ -734,6 +741,12 @@ mod tests {
     fn parse_unwrap<V: WasmValue>(input: &str, ty: V::Type) -> V {
         Parser::new(input)
             .parse_value(&ty)
+            .unwrap_or_else(|err| panic!("error decoding {input:?}: {err}"))
+    }
+
+    fn parse_value(input: &str, ty: &Type) -> Value {
+        Parser::new(input)
+            .parse_value(ty)
             .unwrap_or_else(|err| panic!("error decoding {input:?}: {err}"))
     }
 }
