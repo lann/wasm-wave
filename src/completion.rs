@@ -1,3 +1,5 @@
+use indexmap::IndexSet;
+
 use crate::{
     parser::{flattenable, Parser, ParserError, ERR, NONE, OK, SOME},
     value::{Type, Value},
@@ -86,8 +88,8 @@ fn type_candidates(partial: &str, ty: &impl WasmType) -> Vec<String> {
         Variant => variant_completions(partial, ty.variant_cases().map(|(name, _)| name)),
         Option => bare_completions(partial, Some(ty.option_some_type().unwrap()), [SOME, NONE]),
         Result => bare_completions(partial, ty.result_types().unwrap().0, [OK, ERR]),
-        // TODO: These will require some more work.
-        Flags => vec![],
+        Flags => flags_candidates(partial, ty),
+        // TODO: This will require some more work.
         Record => vec![],
         Unsupported => vec![],
     }
@@ -163,6 +165,44 @@ fn string_like_completions(partial: &str, delim: &'static str) -> Vec<String> {
     .into_iter()
     .map(Into::into)
     .collect()
+}
+
+fn flags_candidates(partial: &str, flags_ty: &impl WasmType) -> Vec<String> {
+    if partial.is_empty() {
+        return vec!["{".into()];
+    }
+    let mut seen = partial
+        .strip_prefix('{')
+        .unwrap_or_default()
+        .split(',')
+        .map(|s| s.trim())
+        .collect::<Vec<_>>();
+    let last = seen.pop().unwrap();
+    // Prep candidate unseen flags set
+    let unseen = flags_ty
+        .flags_names()
+        .filter_map(|name| {
+            if seen.contains(&name.as_ref()) {
+                None
+            } else {
+                Some(name.to_string())
+            }
+        })
+        .collect::<IndexSet<_>>();
+    if last.is_empty() {
+        // No last word; all unseen names are candidates
+        unseen.into_iter().chain(["}".into()]).collect()
+    } else if unseen.contains(last) {
+        // Last word is a complete flag
+        if unseen.len() <= 1 {
+            vec!["}".into()]
+        } else {
+            vec!["}".into(), ",".into()]
+        }
+    } else {
+        // Last word is not a complete flag; attempt to complete it
+        replacement_candidates(last, unseen)
+    }
 }
 
 #[cfg(test)]
@@ -245,6 +285,19 @@ mod tests {
         assert_candidates("o", &ty, &["k"]);
         assert_candidates("e", &ty, &["rr"]);
         assert_candidates("ok", &ty, &["("]);
+    }
+
+    #[test]
+    fn test_flags() {
+        let ty = Type::flags(["read", "write"]).unwrap();
+        assert_candidates("", &ty, &["{"]);
+        assert_candidates("{", &ty, &["read", "write", "}"]);
+        assert_candidates("{r", &ty, &["ead"]);
+        assert_candidates("{read", &ty, &["}", ","]);
+        assert_candidates("{read,", &ty, &["write", "}"]);
+        assert_candidates("{read, w", &ty, &["rite"]);
+        assert_candidates("{read, write", &ty, &["}"]);
+        assert_candidates("{write, ", &ty, &["read", "}"]);
     }
 
     #[test]
