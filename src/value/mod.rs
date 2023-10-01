@@ -12,19 +12,14 @@ mod wit;
 #[cfg(feature = "wit")]
 pub use wit::{resolve_wit_func_type, resolve_wit_type};
 
-use std::{borrow::Cow, collections::HashMap};
+use std::{borrow::Cow, collections::HashMap, sync::Arc};
 
 use self::ty::{
     EnumType, FlagsType, ListType, OptionType, RecordType, ResultType, TupleType, VariantType,
 };
-use crate::{
-    ty::{maybe_unwrap, WasmTypeKind},
-    val::unwrap_val,
-    WasmType, WasmValue,
-};
+use crate::{ty::maybe_unwrap, val::unwrap_val, WasmType, WasmValue};
 
 pub use func::FuncType;
-/// The [`WasmType`] of a [`Value`].
 pub use ty::Type;
 
 /// A Value is a WAVE value.
@@ -57,28 +52,28 @@ pub enum Value {
 #[derive(Debug, Clone, PartialEq)]
 #[doc(hidden)]
 pub struct List {
-    ty: ListType,
+    ty: Arc<ListType>,
     elements: Vec<Value>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 #[doc(hidden)]
 pub struct Record {
-    ty: RecordType,
+    ty: Arc<RecordType>,
     fields: Vec<Value>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 #[doc(hidden)]
 pub struct Tuple {
-    ty: TupleType,
+    ty: Arc<TupleType>,
     elements: Vec<Value>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 #[doc(hidden)]
 pub struct Variant {
-    ty: VariantType,
+    ty: Arc<VariantType>,
     case: usize,
     payload: Option<Box<Value>>,
 }
@@ -86,28 +81,28 @@ pub struct Variant {
 #[derive(Debug, Clone, PartialEq)]
 #[doc(hidden)]
 pub struct Enum {
-    ty: EnumType,
+    ty: Arc<EnumType>,
     case: usize,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 #[doc(hidden)]
 pub struct OptionValue {
-    ty: OptionType,
+    ty: Arc<OptionType>,
     value: Option<Box<Value>>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 #[doc(hidden)]
 pub struct ResultValue {
-    ty: ResultType,
+    ty: Arc<ResultType>,
     value: Result<Option<Box<Value>>, Option<Box<Value>>>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 #[doc(hidden)]
 pub struct Flags {
-    ty: FlagsType,
+    ty: Arc<FlagsType>,
     flags: Vec<usize>,
 }
 
@@ -132,19 +127,19 @@ impl WasmValue for Value {
 
     fn ty(&self) -> Self::Type {
         match self {
-            Self::Bool(_) => Type::Simple(WasmTypeKind::Bool),
-            Self::S8(_) => Type::Simple(WasmTypeKind::S8),
-            Self::S16(_) => Type::Simple(WasmTypeKind::S16),
-            Self::S32(_) => Type::Simple(WasmTypeKind::S32),
-            Self::S64(_) => Type::Simple(WasmTypeKind::S64),
-            Self::U8(_) => Type::Simple(WasmTypeKind::U8),
-            Self::U16(_) => Type::Simple(WasmTypeKind::U16),
-            Self::U32(_) => Type::Simple(WasmTypeKind::U32),
-            Self::U64(_) => Type::Simple(WasmTypeKind::U64),
-            Self::Float32(_) => Type::Simple(WasmTypeKind::Float32),
-            Self::Float64(_) => Type::Simple(WasmTypeKind::Float64),
-            Self::Char(_) => Type::Simple(WasmTypeKind::Char),
-            Self::String(_) => Type::Simple(WasmTypeKind::String),
+            Self::Bool(_) => Type::BOOL,
+            Self::S8(_) => Type::S8,
+            Self::S16(_) => Type::S16,
+            Self::S32(_) => Type::S32,
+            Self::S64(_) => Type::S64,
+            Self::U8(_) => Type::U8,
+            Self::U16(_) => Type::U16,
+            Self::U32(_) => Type::U32,
+            Self::U64(_) => Type::U64,
+            Self::Float32(_) => Type::FLOAT32,
+            Self::Float64(_) => Type::FLOAT64,
+            Self::Char(_) => Type::CHAR,
+            Self::String(_) => Type::STRING,
             Self::List(inner) => Type::List(inner.ty.clone()),
             Self::Record(inner) => Type::Record(inner.ty.clone()),
             Self::Tuple(inner) => Type::Tuple(inner.ty.clone()),

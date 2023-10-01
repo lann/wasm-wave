@@ -50,7 +50,7 @@ macro_rules! impl_primitives {
         $(
             impl ValueTyped for $ty {
                 fn value_type() -> Type {
-                    Type::Simple(WasmTypeKind::$case)
+                    Type::must_simple(WasmTypeKind::$case)
                 }
             }
 
@@ -81,7 +81,7 @@ impl_primitives!(
 
 impl ValueTyped for String {
     fn value_type() -> Type {
-        Type::Simple(WasmTypeKind::String)
+        Type::STRING
     }
 }
 

@@ -1,55 +1,59 @@
-use std::borrow::Cow;
+use std::{borrow::Cow, sync::Arc};
 
 use crate::{
     ty::{maybe_unwrap, WasmTypeKind},
     WasmType,
 };
 
+/// The [`WasmType`] of a [`Value`](super::Value).
 #[derive(Clone, PartialEq)]
 #[allow(missing_docs)]
 pub enum Type {
-    Simple(WasmTypeKind),
-    List(ListType),
-    Record(RecordType),
-    Tuple(TupleType),
-    Variant(VariantType),
-    Enum(EnumType),
-    Option(OptionType),
-    Result(ResultType),
-    Flags(FlagsType),
+    Simple(SimpleType),
+    List(Arc<ListType>),
+    Record(Arc<RecordType>),
+    Tuple(Arc<TupleType>),
+    Variant(Arc<VariantType>),
+    Enum(Arc<EnumType>),
+    Option(Arc<OptionType>),
+    Result(Arc<ResultType>),
+    Flags(Arc<FlagsType>),
 }
 
 #[allow(missing_docs)]
 impl Type {
-    pub const BOOL: Self = Self::Simple(WasmTypeKind::Bool);
-    pub const S8: Self = Self::Simple(WasmTypeKind::S8);
-    pub const S16: Self = Self::Simple(WasmTypeKind::S16);
-    pub const S32: Self = Self::Simple(WasmTypeKind::S32);
-    pub const S64: Self = Self::Simple(WasmTypeKind::S64);
-    pub const U8: Self = Self::Simple(WasmTypeKind::U8);
-    pub const U16: Self = Self::Simple(WasmTypeKind::U16);
-    pub const U32: Self = Self::Simple(WasmTypeKind::U32);
-    pub const U64: Self = Self::Simple(WasmTypeKind::U64);
-    pub const FLOAT32: Self = Self::Simple(WasmTypeKind::Float32);
-    pub const FLOAT64: Self = Self::Simple(WasmTypeKind::Float64);
-    pub const CHAR: Self = Self::Simple(WasmTypeKind::Char);
-    pub const STRING: Self = Self::Simple(WasmTypeKind::String);
+    pub const BOOL: Self = Self::must_simple(WasmTypeKind::Bool);
+    pub const S8: Self = Self::must_simple(WasmTypeKind::S8);
+    pub const S16: Self = Self::must_simple(WasmTypeKind::S16);
+    pub const S32: Self = Self::must_simple(WasmTypeKind::S32);
+    pub const S64: Self = Self::must_simple(WasmTypeKind::S64);
+    pub const U8: Self = Self::must_simple(WasmTypeKind::U8);
+    pub const U16: Self = Self::must_simple(WasmTypeKind::U16);
+    pub const U32: Self = Self::must_simple(WasmTypeKind::U32);
+    pub const U64: Self = Self::must_simple(WasmTypeKind::U64);
+    pub const FLOAT32: Self = Self::must_simple(WasmTypeKind::Float32);
+    pub const FLOAT64: Self = Self::must_simple(WasmTypeKind::Float64);
+    pub const CHAR: Self = Self::must_simple(WasmTypeKind::Char);
+    pub const STRING: Self = Self::must_simple(WasmTypeKind::String);
 
     /// Returns the simple type of the given `kind`. Returns None if the kind
     /// represents a parameterized type.
     pub fn simple(kind: WasmTypeKind) -> Option<Self> {
-        use WasmTypeKind::*;
-        match kind {
-            Bool | S8 | S16 | S32 | S64 | U8 | U16 | U32 | U64 | Float32 | Float64 | Char
-            | String => Some(Self::Simple(kind)),
-            _ => None,
+        is_simple(kind).then_some(Self::Simple(SimpleType(kind)))
+    }
+
+    #[doc(hidden)]
+    pub const fn must_simple(kind: WasmTypeKind) -> Self {
+        if !is_simple(kind) {
+            panic!("kind is not simple");
         }
+        Self::Simple(SimpleType(kind))
     }
 
     /// Returns a list type with the given element type.
-    pub fn list(element_type: impl Into<Box<Self>>) -> Self {
+    pub fn list(element_type: impl Into<Self>) -> Self {
         let element = element_type.into();
-        Self::List(ListType { element })
+        Self::List(Arc::new(ListType { element }))
     }
 
     /// Returns a record type with the given field types. Returns None if
@@ -60,21 +64,21 @@ impl Type {
         let fields = field_types
             .into_iter()
             .map(|(name, ty)| (name.into(), ty))
-            .collect::<Vec<_>>();
+            .collect::<Box<[_]>>();
         if fields.is_empty() {
             return None;
         }
-        Some(Self::Record(RecordType { fields }))
+        Some(Self::Record(Arc::new(RecordType { fields })))
     }
 
     /// Returns a tuple type with the given element types. Returns None if
     /// `element_types` is empty.
-    pub fn tuple(element_types: impl Into<Vec<Self>>) -> Option<Self> {
+    pub fn tuple(element_types: impl Into<Box<[Self]>>) -> Option<Self> {
         let elements = element_types.into();
         if elements.is_empty() {
             return None;
         }
-        Some(Self::Tuple(TupleType { elements }))
+        Some(Self::Tuple(Arc::new(TupleType { elements })))
     }
 
     /// Returns a variant type with the given case names and optional payloads.
@@ -85,44 +89,41 @@ impl Type {
         let cases = cases
             .into_iter()
             .map(|(name, ty)| (name.into(), ty))
-            .collect::<Vec<_>>();
+            .collect::<Box<[_]>>();
         if cases.is_empty() {
             return None;
         }
-        Some(Self::Variant(VariantType { cases }))
+        Some(Self::Variant(Arc::new(VariantType { cases })))
     }
 
     /// Returns an enum type with the given case names. Returns None if `cases`
     /// is empty.
     pub fn enum_ty<T: Into<Box<str>>>(cases: impl IntoIterator<Item = T>) -> Option<Self> {
-        let cases = cases.into_iter().map(Into::into).collect::<Vec<_>>();
+        let cases = cases.into_iter().map(Into::into).collect::<Box<[_]>>();
         if cases.is_empty() {
             return None;
         }
-        Some(Self::Enum(EnumType { cases }))
+        Some(Self::Enum(Arc::new(EnumType { cases })))
     }
 
     /// Returns an option type with the given "some" type.
     pub fn option(some: Self) -> Self {
-        let some = Box::new(some);
-        Self::Option(OptionType { some })
+        Self::Option(Arc::new(OptionType { some }))
     }
 
     /// Returns a result type with the given optional "ok" and "err" payloads.
     pub fn result(ok: Option<Self>, err: Option<Self>) -> Self {
-        let ok = ok.map(Box::new);
-        let err = err.map(Box::new);
-        Self::Result(ResultType { ok, err })
+        Self::Result(Arc::new(ResultType { ok, err }))
     }
 
     /// Returns a flags type with the given flag names. Returns None if `flags`
     /// is empty.
     pub fn flags<T: Into<Box<str>>>(flags: impl IntoIterator<Item = T>) -> Option<Self> {
-        let flags = flags.into_iter().map(Into::into).collect::<Vec<_>>();
+        let flags = flags.into_iter().map(Into::into).collect::<Box<[_]>>();
         if flags.is_empty() {
             return None;
         }
-        Some(Self::Flags(FlagsType { flags }))
+        Some(Self::Flags(Arc::new(FlagsType { flags })))
     }
 
     /// Returns a [`Type`] matching the given [`WasmType`]. Returns None if the
@@ -132,51 +133,62 @@ impl Type {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct SimpleType(WasmTypeKind);
+
+const fn is_simple(kind: WasmTypeKind) -> bool {
+    use WasmTypeKind::*;
+    matches!(
+        kind,
+        Bool | S8 | S16 | S32 | S64 | U8 | U16 | U32 | U64 | Float32 | Float64 | Char | String
+    )
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct ListType {
-    pub(super) element: Box<Type>,
+    pub(super) element: Type,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, PartialEq)]
 pub struct RecordType {
-    pub(super) fields: Vec<(Box<str>, Type)>,
+    pub(super) fields: Box<[(Box<str>, Type)]>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, PartialEq)]
 pub struct TupleType {
-    pub(super) elements: Vec<Type>,
+    pub(super) elements: Box<[Type]>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, PartialEq)]
 pub struct VariantType {
-    pub(super) cases: Vec<(Box<str>, Option<Type>)>,
+    pub(super) cases: Box<[(Box<str>, Option<Type>)]>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, PartialEq)]
 pub struct EnumType {
-    pub(super) cases: Vec<Box<str>>,
+    pub(super) cases: Box<[Box<str>]>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, PartialEq)]
 pub struct OptionType {
-    pub(super) some: Box<Type>,
+    pub(super) some: Type,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, PartialEq)]
 pub struct ResultType {
-    pub(super) ok: Option<Box<Type>>,
-    pub(super) err: Option<Box<Type>>,
+    pub(super) ok: Option<Type>,
+    pub(super) err: Option<Type>,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, PartialEq)]
 pub struct FlagsType {
-    pub(super) flags: Vec<Box<str>>,
+    pub(super) flags: Box<[Box<str>]>,
 }
 
 impl WasmType for Type {
     fn kind(&self) -> WasmTypeKind {
         match self {
-            Type::Simple(kind) => *kind,
+            Type::Simple(simple) => simple.0,
             Type::List(_) => WasmTypeKind::List,
             Type::Record(_) => WasmTypeKind::Record,
             Type::Tuple(_) => WasmTypeKind::Tuple,
@@ -189,8 +201,8 @@ impl WasmType for Type {
     }
 
     fn list_element_type(&self) -> Option<Self> {
-        let list = maybe_unwrap!(self, Self::List)?.clone();
-        Some(*list.element)
+        let list = maybe_unwrap!(self, Self::List)?;
+        Some(list.element.clone())
     }
 
     fn record_fields(&self) -> Box<dyn Iterator<Item = (Cow<str>, Self)> + '_> {
@@ -232,16 +244,13 @@ impl WasmType for Type {
     }
 
     fn option_some_type(&self) -> Option<Self> {
-        let option = maybe_unwrap!(self, Self::Option)?.clone();
-        Some(*option.some)
+        let option = maybe_unwrap!(self, Self::Option)?;
+        Some(option.some.clone())
     }
 
     fn result_types(&self) -> Option<(Option<Self>, Option<Self>)> {
         let result = maybe_unwrap!(self, Self::Result)?;
-        Some((
-            result.ok.as_deref().cloned(),
-            result.err.as_deref().cloned(),
-        ))
+        Some((result.ok.clone(), result.err.clone()))
     }
 
     fn flags_names(&self) -> Box<dyn Iterator<Item = Cow<str>> + '_> {
