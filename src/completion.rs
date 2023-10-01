@@ -1,7 +1,6 @@
-use indexmap::IndexSet;
-
 use crate::{
-    parser::{flattenable, Parser, ParserError, ERR, NONE, OK, SOME},
+    lex::Token,
+    parser::{Parser, ParserError},
     value::{Type, Value},
     WasmType,
 };
@@ -15,9 +14,7 @@ pub fn completions(ty: &impl WasmType, input: &str) -> Option<Completions> {
     let mut parser = Parser::new(input);
     parser.completion(true);
     match parser.parse_value::<Value>(&ty) {
-        Err(ParserError::UnexpectedEnd {
-            completions: completion,
-        }) => completion,
+        Err(ParserError::UnexpectedEnd { completions, .. }) => completions,
         _ => None,
     }
 }
@@ -37,9 +34,7 @@ pub fn params_completions<'ty, T: WasmType + 'static>(
     let mut parser = Parser::new(input);
     parser.completion(true);
     match parser.parse_params::<Value>(types.iter()) {
-        Err(ParserError::UnexpectedEnd {
-            completions: completion,
-        }) => completion,
+        Err(ParserError::UnexpectedEnd { completions, .. }) => completions,
         _ => None,
     }
 }
@@ -53,10 +48,19 @@ pub struct Completions {
 }
 
 impl Completions {
-    pub(crate) fn new(ty: &impl WasmType, partial: &str) -> Self {
+    pub(crate) fn new(ty: &impl WasmType, partial: &str, err: &ParserError) -> Self {
+        use ParserError::*;
+        let candidates = match err {
+            UnexpectedName { expected, got } => replacement_candidates(got, expected),
+            UnexpectedToken {
+                expected,
+                got: None,
+            } => token_candidates(expected),
+            _ => type_candidates(partial, ty),
+        };
         Completions {
             partial: partial.into(),
-            candidates: type_candidates(partial, ty),
+            candidates,
         }
     }
 
@@ -75,23 +79,9 @@ fn type_candidates(partial: &str, ty: &impl WasmType) -> Vec<String> {
     let partial = partial.trim_start();
     use crate::WasmTypeKind::*;
     match ty.kind() {
-        Bool => replacement_candidates(partial, ["true", "false"]),
-        S8 | S16 | S32 | S64 | U8 | U16 | U32 | U64 | Float32 | Float64 => {
-            // TODO: better e.g. float completions
-            replacement_candidates(partial, ["0"])
-        }
         Char => string_like_completions(partial, "'"),
         String => string_like_completions(partial, "\""),
-        List => list_like_completions(partial, "[", "]"),
-        Tuple => list_like_completions(partial, "(", ")"), // TODO: actually count elements
-        Enum => replacement_candidates(partial, ty.enum_cases()),
-        Variant => variant_completions(partial, ty.variant_cases().map(|(name, _)| name)),
-        Option => bare_completions(partial, Some(ty.option_some_type().unwrap()), [SOME, NONE]),
-        Result => bare_completions(partial, ty.result_types().unwrap().0, [OK, ERR]),
-        Flags => flags_candidates(partial, ty),
-        // TODO: This will require some more work.
-        Record => vec![],
-        Unsupported => vec![],
+        _ => vec![],
     }
 }
 
@@ -112,45 +102,6 @@ fn replacement_candidates<T: AsRef<str>>(
         .collect()
 }
 
-fn variant_completions<T: Into<String>>(
-    partial: &str,
-    names: impl IntoIterator<Item = T>,
-) -> Vec<String> {
-    let names = names.into_iter().map(|n| n.into()).collect::<Vec<_>>();
-    if names.contains(&partial.to_string()) {
-        vec!["(".into()]
-    } else if partial.contains('(') {
-        vec![")".into()]
-    } else {
-        replacement_candidates(partial, &names)
-    }
-}
-
-fn bare_completions(
-    partial: &str,
-    bare_type: Option<impl WasmType>,
-    cases: [&'static str; 2],
-) -> Vec<String> {
-    let candidates = variant_completions(partial, cases);
-    if !candidates.is_empty() {
-        return candidates;
-    }
-    if let Some(ty) = bare_type {
-        if flattenable(ty.kind()) {
-            return type_candidates(partial, &ty);
-        }
-    }
-    vec![]
-}
-
-fn list_like_completions(partial: &str, open: &'static str, close: &'static str) -> Vec<String> {
-    if partial.is_empty() {
-        vec![open.into()]
-    } else {
-        vec![",".into(), close.into()]
-    }
-}
-
 fn string_like_completions(partial: &str, delim: &'static str) -> Vec<String> {
     // TODO: be more precise about escape detection
     if partial.ends_with('\\') {
@@ -167,42 +118,20 @@ fn string_like_completions(partial: &str, delim: &'static str) -> Vec<String> {
     .collect()
 }
 
-fn flags_candidates(partial: &str, flags_ty: &impl WasmType) -> Vec<String> {
-    if partial.is_empty() {
-        return vec!["{".into()];
-    }
-    let mut seen = partial
-        .strip_prefix('{')
-        .unwrap_or_default()
-        .split(',')
-        .map(|s| s.trim())
-        .collect::<Vec<_>>();
-    let last = seen.pop().unwrap();
-    // Prep candidate unseen flags set
-    let unseen = flags_ty
-        .flags_names()
-        .filter_map(|name| {
-            if seen.contains(&name.as_ref()) {
-                None
-            } else {
-                Some(name.to_string())
-            }
+fn token_candidates(tokens: &[Token]) -> Vec<String> {
+    tokens
+        .iter()
+        .filter_map(|tok| {
+            tok.as_char()
+                .or(match tok {
+                    Token::Number => Some('0'),
+                    Token::Char => Some('\''),
+                    Token::String => Some('"'),
+                    _ => None,
+                })
+                .map(Into::into)
         })
-        .collect::<IndexSet<_>>();
-    if last.is_empty() {
-        // No last word; all unseen names are candidates
-        unseen.into_iter().chain(["}".into()]).collect()
-    } else if unseen.contains(last) {
-        // Last word is a complete flag
-        if unseen.len() <= 1 {
-            vec!["}".into()]
-        } else {
-            vec!["}".into(), ",".into()]
-        }
-    } else {
-        // Last word is not a complete flag; attempt to complete it
-        replacement_candidates(last, unseen)
-    }
+        .collect()
 }
 
 #[cfg(test)]
@@ -218,6 +147,7 @@ mod tests {
             ("fa", Type::BOOL, &["lse"]),
             ("maybe", Type::BOOL, &[]),
             ("", Type::U8, &["0"]),
+            ("", Type::S8, &["0", "-"]),
             ("'", Type::CHAR, &[]),
             ("'\\", Type::CHAR, &["'", "\\", "t", "n", "r", "u"]),
             ("'\\u", Type::CHAR, &["{"]),
@@ -237,6 +167,21 @@ mod tests {
         assert_candidates("[true", &ty, &[",", "]"]);
         assert_candidates("[true, fa", &ty, &["lse"]);
         assert_candidates("[true, false", &ty, &[",", "]"]);
+    }
+
+    #[test]
+    fn test_records() {
+        let ty = Type::record([("first", Type::BOOL), ("second", Type::BOOL)]).unwrap();
+        assert_candidates("", &ty, &["{"]);
+        assert_candidates("{", &ty, &["first", "second"]);
+        assert_candidates("{f", &ty, &["irst"]);
+        assert_candidates("{first", &ty, &[":"]);
+        assert_candidates("{first:", &ty, &["true", "false"]);
+        assert_candidates("{first: t", &ty, &["rue"]);
+        assert_candidates("{first: true", &ty, &[",", "}"]);
+        assert_candidates("{first: true,", &ty, &["second"]);
+        assert_candidates("{first: true, s", &ty, &["econd"]);
+        assert_candidates("{first: true, second: false", &ty, &[",", "}"]);
     }
 
     #[test]
@@ -291,13 +236,13 @@ mod tests {
     fn test_flags() {
         let ty = Type::flags(["read", "write"]).unwrap();
         assert_candidates("", &ty, &["{"]);
-        assert_candidates("{", &ty, &["read", "write", "}"]);
+        assert_candidates("{", &ty, &["read", "write"]);
         assert_candidates("{r", &ty, &["ead"]);
         assert_candidates("{read", &ty, &["}", ","]);
-        assert_candidates("{read,", &ty, &["write", "}"]);
+        assert_candidates("{read,", &ty, &["write"]);
         assert_candidates("{read, w", &ty, &["rite"]);
-        assert_candidates("{read, write", &ty, &["}"]);
-        assert_candidates("{write, ", &ty, &["read", "}"]);
+        assert_candidates("{read, write", &ty, &["}", ","]);
+        assert_candidates("{write, ", &ty, &["read"]);
     }
 
     #[test]

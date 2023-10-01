@@ -4,9 +4,9 @@ use std::{ops::Range, slice::SliceIndex, str::Chars};
 pub enum Token {
     Whitespace,
 
+    Dash,
     Colon,
     Comma,
-    Dash,
     LCurly,
     RCurly,
     LParen,
@@ -18,6 +18,24 @@ pub enum Token {
     Number,
     Char,
     String,
+}
+
+impl Token {
+    /// Returns the single literal char that this token represents, if any.
+    pub fn as_char(self) -> Option<char> {
+        Some(match self {
+            Token::Dash => '-',
+            Token::Colon => ':',
+            Token::Comma => ',',
+            Token::LCurly => '{',
+            Token::RCurly => '}',
+            Token::LParen => '(',
+            Token::RParen => ')',
+            Token::LSquare => '[',
+            Token::RSquare => ']',
+            _ => return None,
+        })
+    }
 }
 
 pub type Span = Range<usize>;
@@ -59,9 +77,9 @@ impl<'a> Tokenizer<'a> {
 
         // Single char tokens
         if let Some(token) = match ch {
+            '-' => Some(Token::Dash),
             ':' => Some(Token::Colon),
             ',' => Some(Token::Comma),
-            '-' => Some(Token::Dash),
             '{' => Some(Token::LCurly),
             '}' => Some(Token::RCurly),
             '(' => Some(Token::LParen),

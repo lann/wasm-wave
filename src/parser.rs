@@ -1,14 +1,13 @@
 //! Web Assembly Value Encoding parser.
 
 use std::{
-    borrow::Cow,
-    collections::HashSet,
+    borrow::{Borrow, Cow},
     fmt::Display,
     num::{ParseFloatError, ParseIntError},
     str::FromStr,
 };
 
-use indexmap::IndexMap;
+use indexmap::{IndexMap, IndexSet};
 
 use crate::{
     completion::Completions,
@@ -29,6 +28,8 @@ pub(crate) const SOME: &str = "some";
 pub(crate) const NONE: &str = "none";
 pub(crate) const OK: &str = "ok";
 pub(crate) const ERR: &str = "err";
+pub(crate) const TRUE: &str = "true";
+pub(crate) const FALSE: &str = "false";
 
 impl<'a> Parser<'a> {
     /// Returns a new Parser for the given input.
@@ -58,16 +59,16 @@ impl<'a> Parser<'a> {
     fn parse_value_inner<V: WasmValue>(&mut self, ty: &V::Type) -> Result<V, ParserError> {
         Ok(match ty.kind() {
             WasmTypeKind::Bool => V::make_bool(self.parse_bool()?),
-            WasmTypeKind::S8 => V::make_s8(self.parse_number()?),
-            WasmTypeKind::S16 => V::make_s16(self.parse_number()?),
-            WasmTypeKind::S32 => V::make_s32(self.parse_number()?),
-            WasmTypeKind::S64 => V::make_s64(self.parse_number()?),
-            WasmTypeKind::U8 => V::make_u8(self.parse_number()?),
-            WasmTypeKind::U16 => V::make_u16(self.parse_number()?),
-            WasmTypeKind::U32 => V::make_u32(self.parse_number()?),
-            WasmTypeKind::U64 => V::make_u64(self.parse_number()?),
-            WasmTypeKind::Float32 => V::make_float32(self.parse_number()?),
-            WasmTypeKind::Float64 => V::make_float64(self.parse_number()?),
+            WasmTypeKind::S8 => V::make_s8(self.parse_number(true)?),
+            WasmTypeKind::S16 => V::make_s16(self.parse_number(true)?),
+            WasmTypeKind::S32 => V::make_s32(self.parse_number(true)?),
+            WasmTypeKind::S64 => V::make_s64(self.parse_number(true)?),
+            WasmTypeKind::U8 => V::make_u8(self.parse_number(false)?),
+            WasmTypeKind::U16 => V::make_u16(self.parse_number(false)?),
+            WasmTypeKind::U32 => V::make_u32(self.parse_number(false)?),
+            WasmTypeKind::U64 => V::make_u64(self.parse_number(false)?),
+            WasmTypeKind::Float32 => V::make_float32(self.parse_number(true)?),
+            WasmTypeKind::Float64 => V::make_float64(self.parse_number(true)?),
             WasmTypeKind::Char => V::make_char(self.parse_char()?),
             WasmTypeKind::String => V::make_string(self.parse_string()?),
             WasmTypeKind::List => self.parse_list(ty)?,
@@ -137,29 +138,34 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_bool(&mut self) -> Result<bool, ParserError> {
-        match self.parse_name()? {
-            "false" => Ok(false),
-            "true" => Ok(true),
-            other => Err(ParserError::unexpected_name(["false", "true"], other)),
+        let names = [TRUE, FALSE];
+        match self.expect_name(names)? {
+            TRUE => Ok(true),
+            FALSE => Ok(false),
+            other => Err(ParserError::unexpected_name(names, other)),
         }
     }
 
-    fn parse_number<T>(&mut self) -> Result<T, ParserError>
+    fn parse_number<T>(&mut self, signed: bool) -> Result<T, ParserError>
     where
         T: FromStr,
         ParserError: From<T::Err>,
     {
-        let (token, mut span) = self.expect_any_of(&[Token::Dash, Token::Name, Token::Number])?;
+        let (token, mut span) = self.expect_any_of(if signed {
+            &[Token::Number, Token::Dash, Token::Name]
+        } else {
+            &[Token::Number, Token::Name]
+        })?;
         if token == Token::Dash {
             // Whitespace isn't allowed here, so get the next token directly
             match self.tokens.next_token()? {
-                Some(Token::Name | Token::Number) => {
+                Some(Token::Number | Token::Name) => {
                     // Include leading dash in span
                     span.end = self.tokens.pos();
                 }
                 other => {
                     return Err(ParserError::UnexpectedToken {
-                        expected: vec![Token::Name, Token::Number],
+                        expected: vec![Token::Number, Token::Name],
                         got: other,
                     })
                 }
@@ -249,11 +255,16 @@ impl<'a> Parser<'a> {
             if let Some((Token::RCurly, _)) = self.peek_next_non_whitespace()? {
                 break;
             }
-            let name = self.parse_name()?;
+            let remaining = field_types
+                .keys()
+                .zip(&values)
+                .filter_map(|(name, val)| val.is_none().then_some(name.as_ref()));
+
+            let name = self.expect_name(remaining.clone())?;
 
             let (idx, ty) = field_types
                 .get(name)
-                .ok_or_else(|| ParserError::RecordFieldUnknown(name.to_string()))?;
+                .ok_or_else(|| ParserError::unexpected_name(remaining, name.to_string()))?;
 
             self.expect(Token::Colon)?;
 
@@ -270,9 +281,10 @@ impl<'a> Parser<'a> {
                 let val = match maybe_val {
                     Some(val) => val,
                     None if ty.kind() == WasmTypeKind::Option => {
+                        // Omitted `option` field; use "none"
                         V::make_option(ty, None).map_err(ParserError::make_value)?
                     }
-                    None => return Err(ParserError::RecordFieldMissing(name.to_string())),
+                    None => return Err(ParserError::FieldMissing(name.to_string())),
                 };
                 Ok((name.as_ref(), val))
             })
@@ -300,7 +312,7 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_variant<V: WasmValue>(&mut self, ty: &V::Type) -> Result<V, ParserError> {
-        let name = self.parse_name()?;
+        let name = self.expect_name(ty.variant_cases().map(|(name, _)| name))?;
         let (case_name, case_ty) = ty
             .variant_cases()
             .find(|(case_name, _)| case_name.as_ref() == name)
@@ -312,7 +324,7 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_enum<V: WasmValue>(&mut self, ty: &V::Type) -> Result<V, ParserError> {
-        let name = self.parse_name()?;
+        let name = self.expect_name(ty.enum_cases())?;
         V::make_enum(ty, name).map_err(ParserError::make_value)
     }
 
@@ -358,18 +370,24 @@ impl<'a> Parser<'a> {
 
     fn parse_flags<V: WasmValue>(&mut self, ty: &V::Type) -> Result<V, ParserError> {
         self.expect(Token::LCurly)?;
-        let names: HashSet<_> = ty.flags_names().collect();
-        let mut flags = vec![];
+        let names: IndexSet<_> = ty.flags_names().collect();
+        let mut flags = IndexSet::<_>::new();
         loop {
             if let Some((Token::RCurly, _)) = self.peek_next_non_whitespace()? {
                 break;
             }
-            let name = self.parse_name()?;
+            let remaining = names
+                .iter()
+                .cloned()
+                .filter(|name| !flags.contains(name.as_ref()));
+            let name = self.expect_name(remaining.clone())?;
             let flag = names
                 .get(name)
-                .ok_or_else(|| ParserError::unexpected_name(ty.flags_names(), name))?;
-            flags.push(flag.as_ref());
-            if let (Token::RCurly, _) = self.expect_any_of(&[Token::Comma, Token::RCurly])? {
+                .ok_or_else(|| ParserError::unexpected_name(remaining, name))?;
+            if !flags.insert(flag.as_ref()) {
+                return Err(ParserError::FieldDuplicated(name.into()));
+            }
+            if let (Token::RCurly, _) = self.expect_any_of(&[Token::RCurly, Token::Comma])? {
                 break;
             }
         }
@@ -474,6 +492,26 @@ impl<'a> Parser<'a> {
         }
     }
 
+    fn expect_name<T: Borrow<str>>(
+        &mut self,
+        names: impl IntoIterator<Item = T>,
+    ) -> Result<&str, ParserError> {
+        let name = match self.parse_name() {
+            Ok(name) => name,
+            Err(ParserError::UnexpectedToken { got: None, .. }) => "",
+            Err(other) => return Err(other),
+        };
+        let names = names.into_iter().collect::<Vec<_>>();
+        if names.iter().any(|n| n.borrow() == name) {
+            Ok(name)
+        } else {
+            Err(ParserError::unexpected_name(
+                names.iter().map(|n| n.borrow().to_string()),
+                name,
+            ))
+        }
+    }
+
     fn parse_name(&mut self) -> Result<&str, ParserError> {
         let span = self.expect(Token::Name)?;
         Ok(self.tokens.get_span(span))
@@ -500,19 +538,25 @@ impl<'a> Parser<'a> {
         ty: &impl WasmType,
     ) -> ParserError {
         // Convert several errors to `UnexpectedEnd` with optional Completion
-        match err {
-            ParserError::Lex(LexError::UnexpectedEnd)
-            | ParserError::UnexpectedToken { got: None, .. }
-            | ParserError::UnexpectedEnd { completions: None } => (),
-            ParserError::UnexpectedName { .. } | ParserError::MakeValueError(_)
-                if self.tokens.ended() => {}
-            _ => return err,
-        }
-        ParserError::UnexpectedEnd {
-            completions: self.completion.then(|| {
+        let is_unexpected_end = {
+            use ParserError::*;
+            match err {
+                Lex(LexError::UnexpectedEnd) | UnexpectedToken { got: None, .. } => true,
+                MakeValueError(_) | ParseFloat(_) | UnexpectedName { .. } => self.tokens.ended(),
+                _ => false,
+            }
+        };
+        if is_unexpected_end {
+            let completions = self.completion.then(|| {
                 let prefix = self.tokens.get_span(start..);
-                crate::completion::Completions::new(ty, prefix)
-            }),
+                crate::completion::Completions::new(ty, prefix, &err)
+            });
+            ParserError::UnexpectedEnd {
+                source: Box::new(err),
+                completions,
+            }
+        } else {
+            err
         }
     }
 }
@@ -547,9 +591,6 @@ pub enum ParserError {
     /// Invalid char or string escape
     #[error("invalid escape: `\\{0}`")]
     InvalidEscape(String),
-    /// Invalid `option` or `result` flattening
-    #[error("cannot flatten nested {0:?}s")]
-    InvalidFlattening(WasmTypeKind),
     /// Lexing (tokenizing) error
     #[error("invalid token: {0}")]
     Lex(#[from] crate::lex::LexError),
@@ -567,14 +608,11 @@ pub enum ParserError {
     ParseParams(String),
     /// Duplicate record field
     #[error("duplicate field `{0}`")]
-    RecordFieldDuplicated(String),
+    FieldDuplicated(String),
     /// Missing record field
     #[error("missing field `{0}`")]
-    RecordFieldMissing(String),
-    /// Unknown (undefined) record field
-    #[error("unknown field `{0}`")]
-    RecordFieldUnknown(String),
-    /// Unexpected name token
+    FieldMissing(String),
+    /// RecordUnexpected name token
     #[error("expected {expected:?}, got {got:?}")]
     UnexpectedName {
         /// Expected name(s)
@@ -585,6 +623,8 @@ pub enum ParserError {
     /// Unexpected end of input
     #[error("unexpected end of input")]
     UnexpectedEnd {
+        /// Underlying error at end of input
+        source: Box<Self>,
         /// Completion data, if enabled
         completions: Option<Completions>,
     },
