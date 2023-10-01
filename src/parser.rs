@@ -140,10 +140,7 @@ impl<'a> Parser<'a> {
         match self.parse_name()? {
             "false" => Ok(false),
             "true" => Ok(true),
-            other => Err(ParserError::UnexpectedName {
-                expected: vec!["false".into(), "true".into()],
-                got: other.into(),
-            }),
+            other => Err(ParserError::unexpected_name(["false", "true"], other)),
         }
     }
 
@@ -307,12 +304,8 @@ impl<'a> Parser<'a> {
         let (case_name, case_ty) = ty
             .variant_cases()
             .find(|(case_name, _)| case_name.as_ref() == name)
-            .ok_or_else(|| ParserError::UnexpectedName {
-                expected: ty
-                    .variant_cases()
-                    .map(|(name, _)| name.as_ref().into())
-                    .collect(),
-                got: name.into(),
+            .ok_or_else(|| {
+                ParserError::unexpected_name(ty.variant_cases().map(|(name, _)| name), name)
             })?;
         V::make_variant(ty, case_name.as_ref(), self.parse_maybe_payload(case_ty)?)
             .map_err(ParserError::make_value)
@@ -331,19 +324,14 @@ impl<'a> Parser<'a> {
                 SOME => self.parse_maybe_payload(Some(some_ty))?,
                 NONE => None,
                 other => {
-                    return Err(ParserError::UnexpectedName {
-                        expected: vec![SOME.into(), NONE.into()],
-                        got: other.into(),
-                    })
+                    return Err(ParserError::unexpected_name([SOME, NONE], other));
                 }
             }
         } else if flattenable(some_ty.kind()) {
             Some(self.parse_value(&some_ty)?)
         } else {
-            return Err(ParserError::UnexpectedName {
-                expected: vec![SOME.into(), NONE.into()],
-                got: self.parse_name()?.into(),
-            });
+            let got = self.parse_name()?;
+            return Err(ParserError::unexpected_name([SOME, NONE], got));
         };
         V::make_option(ty, val).map_err(ParserError::make_value)
     }
@@ -356,19 +344,14 @@ impl<'a> Parser<'a> {
                 OK => Ok(self.parse_maybe_payload(ok_ty)?),
                 ERR => Err(self.parse_maybe_payload(err_ty)?),
                 other => {
-                    return Err(ParserError::UnexpectedName {
-                        expected: vec![OK.into(), ERR.into()],
-                        got: other.into(),
-                    })
+                    return Err(ParserError::unexpected_name([OK, ERR], other));
                 }
             }
         } else if ok_ty.is_some() && flattenable(ok_ty.as_ref().unwrap().kind()) {
             Ok(Some(self.parse_value(&ok_ty.unwrap())?))
         } else {
-            return Err(ParserError::UnexpectedName {
-                expected: vec![OK.into(), ERR.into()],
-                got: self.parse_name()?.into(),
-            });
+            let got = self.parse_name()?;
+            return Err(ParserError::unexpected_name([OK, ERR], got));
         };
         V::make_result(ty, val).map_err(ParserError::make_value)
     }
@@ -382,13 +365,9 @@ impl<'a> Parser<'a> {
                 break;
             }
             let name = self.parse_name()?;
-            let flag = names.get(name).ok_or_else(|| ParserError::UnexpectedName {
-                expected: ty
-                    .flags_names()
-                    .map(|name| name.as_ref().to_string())
-                    .collect(),
-                got: name.into(),
-            })?;
+            let flag = names
+                .get(name)
+                .ok_or_else(|| ParserError::unexpected_name(ty.flags_names(), name))?;
             flags.push(flag.as_ref());
             if let (Token::RCurly, _) = self.expect_any_of(&[Token::Comma, Token::RCurly])? {
                 break;
@@ -625,6 +604,16 @@ pub enum ParserError {
 impl ParserError {
     fn make_value(err: impl Display) -> Self {
         Self::MakeValueError(err.to_string())
+    }
+
+    fn unexpected_name<I: Into<String>>(
+        expected: impl IntoIterator<Item = I>,
+        got: impl Into<String>,
+    ) -> Self {
+        Self::UnexpectedName {
+            expected: expected.into_iter().map(Into::into).collect(),
+            got: got.into(),
+        }
     }
 }
 
