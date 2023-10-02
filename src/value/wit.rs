@@ -197,7 +197,7 @@ mod tests {
         let mut resolve = Resolve::new();
         resolve.push(unresolved).unwrap();
 
-        for (func_name, debug) in [
+        for (func_name, expected_display) in [
             ("no-results", "func(a: u8, b: string)"),
             ("one-result", "func(c: u8, d: string) -> u8"),
             (
@@ -212,7 +212,7 @@ mod tests {
                 .find_map(|(name, function)| (name == func_name).then_some(function))
                 .unwrap();
             let ty = resolve_wit_func_type(&resolve, function).unwrap();
-            assert_eq!(format!("{ty:?}"), debug, "for {function:?}");
+            assert_eq!(ty.to_string(), expected_display, "for {function:?}");
         }
     }
 }

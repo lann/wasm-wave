@@ -20,7 +20,8 @@ use crate::{
 /// A Web Assembly Value Encoding parser.
 pub struct Parser<'a> {
     tokens: Tokenizer<'a>,
-    peeked: Option<(Token, Span)>,
+    peeked: Option<Result<(Token, Span), ParserError>>,
+    peeked_pos: usize,
     completion: bool,
 }
 
@@ -37,6 +38,7 @@ impl<'a> Parser<'a> {
         Self {
             tokens: Tokenizer::new(input),
             peeked: None,
+            peeked_pos: 0,
             completion: false,
         }
     }
@@ -53,7 +55,7 @@ impl<'a> Parser<'a> {
     pub fn parse_value<V: WasmValue>(&mut self, ty: &V::Type) -> Result<V, ParserError> {
         let start = self.pos();
         self.parse_value_inner(ty)
-            .map_err(|err| self.handle_unexpected_end_errors(err, start, ty))
+            .map_err(|err| self.handle_unexpected_end_errors(err, start, Some(ty)))
     }
 
     fn parse_value_inner<V: WasmValue>(&mut self, ty: &V::Type) -> Result<V, ParserError> {
@@ -93,45 +95,58 @@ impl<'a> Parser<'a> {
         &mut self,
         types: impl IntoIterator<Item = &'ty V::Type>,
     ) -> Result<Vec<V>, ParserError> {
+        self.parse_params_inner(types)
+            .map_err(|err| self.handle_unexpected_end_errors(err, 0, None::<&V::Type>))
+    }
+
+    fn parse_params_inner<'ty, V: WasmValue + 'static>(
+        &mut self,
+        types: impl IntoIterator<Item = &'ty V::Type>,
+    ) -> Result<Vec<V>, ParserError> {
         self.expect(Token::LParen)?;
 
+        let types = types.into_iter().collect::<Vec<_>>();
+        let min_len = types
+            .iter()
+            .rposition(|ty| ty.kind() != WasmTypeKind::Option)
+            .map(|idx| idx + 1)
+            .unwrap_or(0);
+        let max_len = types.len();
+
         let mut types = types.into_iter();
-        let mut values = Vec::with_capacity(types.size_hint().0);
+        let mut values = Vec::with_capacity(max_len);
         loop {
-            if let Some((Token::RParen, _)) = self.peek_next_non_whitespace()? {
-                self.next_non_whitespace()?;
+            if values.len() >= min_len
+                && self.maybe_close_delim(Token::RParen, values.len() == max_len)?
+            {
                 break;
             }
+
             let ty = types.next().ok_or_else(|| {
-                ParserError::ParseParams(format!(
-                    "too many param values; expected {}",
-                    values.len()
-                ))
+                ParserError::ParseParams(format!("too many params; expected at most {max_len}"))
             })?;
             values.push(self.parse_value(ty)?);
-            if let (Token::RParen, _) = self.expect_any_of(&[Token::Comma, Token::RParen])? {
-                break;
+
+            if values.len() >= min_len {
+                if let (Token::RParen, _) = self.expect_any_of(&[Token::Comma, Token::RParen])? {
+                    break;
+                }
+            } else {
+                self.expect(Token::Comma)?;
             }
         }
-        // Handle trailing option types
+        // Handle omitted trailing 'none' values
         for ty in types {
-            if ty.kind() == WasmTypeKind::Option {
-                let none = V::make_option(ty, None).map_err(ParserError::make_value)?;
-                values.push(none);
-            } else {
-                return Err(ParserError::ParseParams(format!(
-                    "not enough param values; got {}",
-                    values.len()
-                )));
-            }
+            let none = V::make_option(ty, None).map_err(ParserError::make_value)?;
+            values.push(none);
         }
         Ok(values)
     }
 
     /// Returns the current byte position in the input.
     pub fn pos(&self) -> usize {
-        if let Some((_, Span { start, .. })) = self.peeked {
-            start
+        if self.peeked.is_some() {
+            self.peeked_pos
         } else {
             self.tokens.pos()
         }
@@ -231,10 +246,12 @@ impl<'a> Parser<'a> {
 
         let mut elements = vec![];
         loop {
-            if let Some((Token::RSquare, _)) = self.peek_next_non_whitespace()? {
+            if self.maybe_close_delim(Token::RSquare, false)? {
                 break;
             }
+
             elements.push(self.parse_value(&ty.list_element_type().unwrap())?);
+
             if let (Token::RSquare, _) = self.expect_any_of(&[Token::Comma, Token::RSquare])? {
                 break;
             }
@@ -250,30 +267,37 @@ impl<'a> Parser<'a> {
             .enumerate()
             .map(|(idx, (name, ty))| (name, (idx, ty)))
             .collect::<IndexMap<_, _>>();
+        let mut remaining = field_types
+            .iter()
+            .map(|(name, (_, ty))| (name.as_ref(), ty.kind() == WasmTypeKind::Option))
+            .collect::<IndexMap<_, _>>();
+
         let mut values = vec![None; field_types.len()];
         loop {
-            if let Some((Token::RCurly, _)) = self.peek_next_non_whitespace()? {
+            if remaining.values().all(|optional| *optional)
+                && self.maybe_close_delim(Token::RCurly, remaining.is_empty())?
+            {
                 break;
             }
-            let remaining = field_types
-                .keys()
-                .zip(&values)
-                .filter_map(|(name, val)| val.is_none().then_some(name.as_ref()));
 
-            let name = self.expect_name(remaining.clone())?;
-
-            let (idx, ty) = field_types
-                .get(name)
-                .ok_or_else(|| ParserError::unexpected_name(remaining, name.to_string()))?;
+            let name = self.expect_name(remaining.keys().cloned())?;
+            remaining.remove(name);
+            let (idx, ty) = field_types.get(name).unwrap();
 
             self.expect(Token::Colon)?;
 
             values[*idx] = Some(self.parse_value(ty)?);
 
-            if let (Token::RCurly, _) = self.expect_any_of(&[Token::Comma, Token::RCurly])? {
-                break;
+            if remaining.values().all(|optional| *optional) {
+                if let (Token::RCurly, _) = self.expect_any_of(&[Token::RCurly, Token::Comma])? {
+                    break;
+                }
+            } else {
+                self.expect(Token::Comma)?;
             }
         }
+
+        // Collect fields into correctly-ordered vec
         let fields = field_types
             .iter()
             .zip(values)
@@ -295,18 +319,19 @@ impl<'a> Parser<'a> {
     fn parse_tuple<V: WasmValue>(&mut self, ty: &V::Type) -> Result<V, ParserError> {
         self.expect(Token::LParen)?;
 
-        let types = ty.tuple_element_types();
-        let mut values = Vec::with_capacity(types.size_hint().0);
-        let mut saw_rparen = false;
-        for ty in types {
+        let types = ty.tuple_element_types().collect::<Vec<_>>();
+        let len = types.len();
+        let mut values = Vec::with_capacity(len);
+        for ty in types.into_iter() {
             values.push(self.parse_value(&ty)?);
-            if let (Token::RParen, _) = self.expect_any_of(&[Token::Comma, Token::RParen])? {
-                saw_rparen = true;
-                break;
+
+            if values.len() == len {
+                if let (Token::Comma, _) = self.expect_any_of(&[Token::RParen, Token::Comma])? {
+                    self.expect(Token::RParen)?;
+                }
+            } else {
+                self.expect(Token::Comma)?;
             }
-        }
-        if !saw_rparen {
-            self.expect(Token::RParen)?;
         }
         V::make_tuple(ty, values).map_err(ParserError::make_value)
     }
@@ -330,7 +355,7 @@ impl<'a> Parser<'a> {
 
     fn parse_option<V: WasmValue>(&mut self, ty: &V::Type) -> Result<V, ParserError> {
         let some_ty = ty.option_some_type().unwrap();
-        let peek_name = self.peek_name()?;
+        let peek_name = self.peek_name();
         let val = if peek_name.is_some_and(|s| SOME.starts_with(s) || NONE.starts_with(s)) {
             match self.parse_name()? {
                 SOME => self.parse_maybe_payload(Some(some_ty))?,
@@ -350,7 +375,7 @@ impl<'a> Parser<'a> {
 
     fn parse_result<V: WasmValue>(&mut self, ty: &V::Type) -> Result<V, ParserError> {
         let (ok_ty, err_ty) = ty.result_types().unwrap();
-        let peek_name = self.peek_name()?;
+        let peek_name = self.peek_name();
         let val = if peek_name.is_some_and(|s| OK.starts_with(s) || ERR.starts_with(s)) {
             match self.parse_name()? {
                 OK => Ok(self.parse_maybe_payload(ok_ty)?),
@@ -373,20 +398,21 @@ impl<'a> Parser<'a> {
         let names: IndexSet<_> = ty.flags_names().collect();
         let mut flags = IndexSet::<_>::new();
         loop {
-            if let Some((Token::RCurly, _)) = self.peek_next_non_whitespace()? {
+            if self.maybe_close_delim(Token::RCurly, flags.len() == names.len())? {
                 break;
             }
+
             let remaining = names
                 .iter()
                 .cloned()
                 .filter(|name| !flags.contains(name.as_ref()));
             let name = self.expect_name(remaining.clone())?;
-            let flag = names
-                .get(name)
-                .ok_or_else(|| ParserError::unexpected_name(remaining, name))?;
+
+            let flag = names.get(name).unwrap();
             if !flags.insert(flag.as_ref()) {
                 return Err(ParserError::FieldDuplicated(name.into()));
             }
+
             if let (Token::RCurly, _) = self.expect_any_of(&[Token::RCurly, Token::Comma])? {
                 break;
             }
@@ -396,7 +422,7 @@ impl<'a> Parser<'a> {
 
     fn next_non_whitespace(&mut self) -> Result<Option<(Token, Span)>, ParserError> {
         if let Some(peeked) = self.peeked.take() {
-            return Ok(Some(peeked));
+            return Some(peeked).transpose();
         }
         for res in &mut self.tokens {
             let (token, span) = res?;
@@ -407,15 +433,19 @@ impl<'a> Parser<'a> {
         Ok(None)
     }
 
-    fn peek_next_non_whitespace(&mut self) -> Result<Option<(Token, Span)>, ParserError> {
-        self.peeked = self.next_non_whitespace()?;
-        Ok(self.peeked.clone())
+    fn peek_next_non_whitespace(&mut self) -> Option<(Token, Span)> {
+        self.peeked_pos = self.pos();
+        self.peeked = self.next_non_whitespace().transpose();
+        if let Some(Ok(peeked)) = &self.peeked {
+            Some(peeked.clone())
+        } else {
+            None
+        }
     }
 
-    fn peek_name(&mut self) -> Result<Option<&str>, ParserError> {
-        Ok(self
-            .peek_next_non_whitespace()?
-            .and_then(|(token, span)| (token == Token::Name).then(|| self.tokens.get_span(span))))
+    fn peek_name(&mut self) -> Option<&str> {
+        self.peek_next_non_whitespace()
+            .and_then(|(token, span)| (token == Token::Name).then(|| self.tokens.get_span(span)))
     }
 
     fn expect_any_of(&mut self, expected: &[Token]) -> Result<(Token, Span), ParserError> {
@@ -439,6 +469,20 @@ impl<'a> Parser<'a> {
     fn expect(&mut self, expected: Token) -> Result<Span, ParserError> {
         let (_, span) = self.expect_any_of(&[expected])?;
         Ok(span)
+    }
+
+    fn maybe_close_delim(&mut self, close: Token, must_close: bool) -> Result<bool, ParserError> {
+        if must_close {
+            self.expect(close)?;
+            return Ok(true);
+        }
+        if let Some((peek_token, _)) = self.peek_next_non_whitespace() {
+            if peek_token == close {
+                self.expect(close)?;
+                return Ok(true);
+            }
+        }
+        Ok(false)
     }
 
     // Parse a character within a char or string literal. Also returns the
@@ -535,7 +579,7 @@ impl<'a> Parser<'a> {
         &self,
         err: ParserError,
         start: usize,
-        ty: &impl WasmType,
+        ty: Option<&impl WasmType>,
     ) -> ParserError {
         // Convert several errors to `UnexpectedEnd` with optional Completion
         let is_unexpected_end = {
@@ -549,7 +593,7 @@ impl<'a> Parser<'a> {
         if is_unexpected_end {
             let completions = self.completion.then(|| {
                 let prefix = self.tokens.get_span(start..);
-                crate::completion::Completions::new(ty, prefix, &err)
+                crate::completion::Completions::new(prefix, &err, ty)
             });
             ParserError::UnexpectedEnd {
                 source: Box::new(err),
@@ -571,6 +615,7 @@ impl<'a> From<Tokenizer<'a>> for Parser<'a> {
         Self {
             tokens,
             peeked: None,
+            peeked_pos: 0,
             completion: false,
         }
     }

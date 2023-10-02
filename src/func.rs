@@ -1,6 +1,34 @@
+//! Web Assembly Value Encoding func encodings.
+
 use std::borrow::Cow;
 
-use crate::WasmType;
+use crate::{parser::ParserError, WasmType};
+
+/// Represents an unparsed Web Assembly func call.
+pub struct CallExpr<'a> {
+    /// The func name
+    pub func_name: &'a str,
+    /// The func args, including surrounding parens
+    pub args: &'a str,
+}
+
+impl<'a> CallExpr<'a> {
+    /// Returns a func expr parsed from the given `expr`.
+    pub fn parse(expr: &'a str) -> Result<Self, ParserError> {
+        let paren_idx = expr
+            .find('(')
+            .ok_or_else(|| ParserError::ParseParams("no opening paren in call expr".into()))?;
+        let (name, args) = expr.split_at(paren_idx);
+        let func_name = name.trim();
+        let args = args.trim();
+        if !args.ends_with(')') {
+            return Err(ParserError::ParseParams(
+                "no closing paren in call expr".into(),
+            ));
+        }
+        Ok(Self { func_name, args })
+    }
+}
 
 /// The WasmFunc trait may be implemented to represent Wasm func type
 /// signatures to be (de)serialized with WAVE.

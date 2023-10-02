@@ -1,22 +1,24 @@
-//! Debug formatting types.
+//! Display formatting types.
 
-use crate::{ty::WasmTypeKind, WasmFunc, WasmType};
+use std::fmt::Display;
 
-/// Implements Debug for [`WasmType`]s.
-pub struct TypeDebug<T>(pub T);
+use crate::{func::WasmFunc, ty::WasmTypeKind, writer::Writer, WasmType, WasmValue};
 
-impl<T: WasmType> std::fmt::Debug for TypeDebug<T> {
+/// Implements a WAVE-formatted [`Display`] for a [`WasmType`].
+pub struct DisplayType<T: WasmType>(pub T);
+
+impl<T: WasmType> Display for DisplayType<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let ty = &self.0;
         match ty.kind() {
-            WasmTypeKind::List => write!(f, "list<{:?}>", Self(ty.list_element_type().unwrap())),
+            WasmTypeKind::List => write!(f, "list<{}>", Self(ty.list_element_type().unwrap())),
             WasmTypeKind::Record => {
                 f.write_str("record { ")?;
                 for (idx, (name, field_type)) in ty.record_fields().enumerate() {
                     if idx != 0 {
                         f.write_str(", ")?;
                     }
-                    write!(f, "{name}: {:?}", Self(field_type))?;
+                    write!(f, "{name}: {}", Self(field_type))?;
                 }
                 f.write_str(" }")
             }
@@ -26,7 +28,7 @@ impl<T: WasmType> std::fmt::Debug for TypeDebug<T> {
                     if idx != 0 {
                         f.write_str(", ")?;
                     }
-                    write!(f, "{:?}", Self(ty))?;
+                    write!(f, "{}", Self(ty))?;
                 }
                 f.write_str(">")
             }
@@ -38,7 +40,7 @@ impl<T: WasmType> std::fmt::Debug for TypeDebug<T> {
                     }
                     f.write_str(name.as_ref())?;
                     if let Some(ty) = payload {
-                        write!(f, "({:?})", Self(ty))?;
+                        write!(f, "({})", Self(ty))?;
                     }
                 }
                 f.write_str(" }")
@@ -54,15 +56,15 @@ impl<T: WasmType> std::fmt::Debug for TypeDebug<T> {
                 f.write_str(" }")
             }
             WasmTypeKind::Option => {
-                write!(f, "option<{:?}>", Self(ty.option_some_type().unwrap()))
+                write!(f, "option<{}>", Self(ty.option_some_type().unwrap()))
             }
             WasmTypeKind::Result => {
                 f.write_str("result")?;
                 match ty.result_types().unwrap() {
                     (None, None) => Ok(()),
-                    (None, Some(err)) => write!(f, "<_, {:?}>", Self(err)),
-                    (Some(ok), None) => write!(f, "<{:?}>", Self(ok)),
-                    (Some(ok), Some(err)) => write!(f, "<{:?}, {:?}>", Self(ok), Self(err)),
+                    (None, Some(err)) => write!(f, "<_, {}>", Self(err)),
+                    (Some(ok), None) => write!(f, "<{}>", Self(ok)),
+                    (Some(ok), Some(err)) => write!(f, "<{}, {}>", Self(ok), Self(err)),
                 }
             }
             WasmTypeKind::Flags => {
@@ -75,15 +77,28 @@ impl<T: WasmType> std::fmt::Debug for TypeDebug<T> {
                 }
                 f.write_str(" }")
             }
-            simple => std::fmt::Display::fmt(&simple, f),
+            simple => Display::fmt(&simple, f),
         }
     }
 }
 
-/// Implements Debug for [`WasmFunc`]s.
-pub struct FuncDebug<T>(pub T);
+/// Implements a WAVE-formatted [`Display`] for a [`WasmValue`].
+pub struct DisplayValue<'a, T: WasmValue>(pub &'a T);
 
-impl<T: WasmFunc> std::fmt::Debug for FuncDebug<T> {
+impl<'a, T: WasmValue> Display for DisplayValue<'a, T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut buf = vec![];
+        Writer::new(&mut buf)
+            .write_value(self.0)
+            .map_err(|_| std::fmt::Error)?;
+        f.write_str(String::from_utf8_lossy(&buf).as_ref())
+    }
+}
+
+/// Implements a WAVE-formatted [`Display`] for a [`WasmFunc`].
+pub struct DisplayFunc<T: WasmFunc>(pub T);
+
+impl<T: WasmFunc> Display for DisplayFunc<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str("func(")?;
         let mut param_names = self.0.param_names();
@@ -94,7 +109,7 @@ impl<T: WasmFunc> std::fmt::Debug for FuncDebug<T> {
             if let Some(name) = param_names.next() {
                 write!(f, "{name}: ")?;
             }
-            TypeDebug(ty).fmt(f)?
+            DisplayType(ty).fmt(f)?
         }
         f.write_str(")")?;
 
@@ -105,11 +120,11 @@ impl<T: WasmFunc> std::fmt::Debug for FuncDebug<T> {
 
         let mut result_names = self.0.result_names();
         if results.len() == 1 {
-            let ty = TypeDebug(results.into_iter().next().unwrap());
+            let ty = DisplayType(results.into_iter().next().unwrap());
             if let Some(name) = result_names.next() {
-                write!(f, " -> ({name}: {ty:?})")
+                write!(f, " -> ({name}: {ty})")
             } else {
-                write!(f, " -> {ty:?}")
+                write!(f, " -> {ty}")
             }
         } else {
             f.write_str(" -> (")?;
@@ -120,9 +135,38 @@ impl<T: WasmFunc> std::fmt::Debug for FuncDebug<T> {
                 if let Some(name) = result_names.next() {
                     write!(f, "{name}: ")?;
                 }
-                TypeDebug(ty).fmt(f)?;
+                DisplayType(ty).fmt(f)?;
             }
             f.write_str(")")
+        }
+    }
+}
+
+/// Implements a WAVE-formatted [`Display`] for [`WasmValue`] func arguments.
+pub struct DisplayFuncArgs<'a, T: WasmValue>(pub &'a [T]);
+
+impl<'a, T: WasmValue> Display for DisplayFuncArgs<'a, T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("(")?;
+        for (idx, v) in self.0.iter().enumerate() {
+            if idx != 0 {
+                f.write_str(", ")?;
+            }
+            DisplayValue(v).fmt(f)?;
+        }
+        f.write_str(")")
+    }
+}
+
+/// Implements a WAVE-formatted [`Display`] for [`WasmValue`] func results.
+pub struct DisplayFuncResults<'a, T: WasmValue>(pub &'a [T]);
+
+impl<'a, T: WasmValue> Display for DisplayFuncResults<'a, T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self.0.len() == 1 {
+            DisplayValue(&self.0[0]).fmt(f)
+        } else {
+            DisplayFuncArgs(self.0).fmt(f)
         }
     }
 }
@@ -132,7 +176,7 @@ mod tests {
     use crate::value::Type;
 
     #[test]
-    fn test_type_debug() {
+    fn test_type_display() {
         for (ty, expected) in [
             (Type::U8, "u8"),
             (Type::list(Type::U8), "list<u8>"),
@@ -165,8 +209,7 @@ mod tests {
                 "flags { read, write }",
             ),
         ] {
-            let debug = format!("{ty:?}");
-            assert_eq!(debug, expected);
+            assert_eq!(ty.to_string(), expected);
         }
     }
 }

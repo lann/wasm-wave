@@ -1,4 +1,4 @@
-use crate::WasmFunc;
+use crate::func::WasmFunc;
 
 use super::{Type, ValueError};
 
@@ -58,8 +58,8 @@ impl WasmFunc for FuncType {
     }
 }
 
-impl std::fmt::Debug for FuncType {
+impl std::fmt::Display for FuncType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        crate::fmt::FuncDebug(self.clone()).fmt(f)
+        crate::fmt::DisplayFunc(self.clone()).fmt(f)
     }
 }

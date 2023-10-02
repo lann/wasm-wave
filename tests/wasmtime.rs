@@ -77,8 +77,10 @@ fn test_wasmtime_get_func_type() {
         wasm_wave::wasmtime::get_func_type(&func, store)
     });
 
-    let debug = format!("{func:?}");
-    assert_eq!(debug, "func(bool, enum { first, second }) -> result<u8>");
+    assert_eq!(
+        func.to_string(),
+        "func(bool, enum { first, second }) -> result<u8>"
+    );
 }
 
 fn assert_round_trip(type_name: &str, input: &str, output: &str) {

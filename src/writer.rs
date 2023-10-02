@@ -177,6 +177,12 @@ impl<W: Write> Writer<W> {
     }
 }
 
+impl<W> AsMut<W> for Writer<W> {
+    fn as_mut(&mut self) -> &mut W {
+        &mut self.inner
+    }
+}
+
 /// A Writer error.
 #[derive(Debug, Error)]
 #[non_exhaustive]

@@ -23,13 +23,13 @@ pub fn completions(ty: &impl WasmType, input: &str) -> Option<Completions> {
 /// [`WasmType`] params. Returns None if any of the given params are unsupported
 /// or invalid, or if there is a parsing error that does not allow completion
 /// (e.g. an error before the end of the input).
-pub fn params_completions<'ty, T: WasmType + 'static>(
-    params: impl IntoIterator<Item = &'ty T>,
+pub fn params_completions<T: WasmType>(
+    params: impl IntoIterator<Item = T>,
     input: &str,
 ) -> Option<Completions> {
     let types = params
         .into_iter()
-        .map(Type::from_wasm_type)
+        .map(|ty| Type::from_wasm_type(&ty))
         .collect::<Option<Vec<_>>>()?;
     let mut parser = Parser::new(input);
     parser.completion(true);
@@ -48,7 +48,7 @@ pub struct Completions {
 }
 
 impl Completions {
-    pub(crate) fn new(ty: &impl WasmType, partial: &str, err: &ParserError) -> Self {
+    pub(crate) fn new(partial: &str, err: &ParserError, ty: Option<&impl WasmType>) -> Self {
         use ParserError::*;
         let candidates = match err {
             UnexpectedName { expected, got } => replacement_candidates(got, expected),
@@ -56,7 +56,13 @@ impl Completions {
                 expected,
                 got: None,
             } => token_candidates(expected),
-            _ => type_candidates(partial, ty),
+            _ => {
+                if let Some(ty) = ty {
+                    type_candidates(partial, ty)
+                } else {
+                    vec![]
+                }
+            }
         };
         Completions {
             partial: partial.into(),
@@ -178,10 +184,10 @@ mod tests {
         assert_candidates("{first", &ty, &[":"]);
         assert_candidates("{first:", &ty, &["true", "false"]);
         assert_candidates("{first: t", &ty, &["rue"]);
-        assert_candidates("{first: true", &ty, &[",", "}"]);
+        assert_candidates("{first: true", &ty, &[","]);
         assert_candidates("{first: true,", &ty, &["second"]);
         assert_candidates("{first: true, s", &ty, &["econd"]);
-        assert_candidates("{first: true, second: false", &ty, &[",", "}"]);
+        assert_candidates("{first: true, second: false", &ty, &["}", ","]);
     }
 
     #[test]
@@ -251,14 +257,22 @@ mod tests {
         for (input, expected_candidates) in [
             ("(", &["true", "false"][..]),
             ("(t", &["rue"]),
+            ("(true", &[",", ")"]),
             ("(true, ", &["true", "false"]),
             ("(true, f", &["alse"]),
         ] {
-            let candidates = params_completions(params.iter(), input)
+            let candidates = params_completions(params.clone(), input)
                 .unwrap_or_else(|| panic!("no completions for {input:?}"))
                 .candidates;
             assert_eq!(candidates, expected_candidates, "for {input:?}");
         }
+    }
+
+    #[test]
+    fn test_bare_string_param_completion() {
+        let params = [Type::option(Type::STRING)];
+        let candidates = params_completions(params, "(\"\\u").unwrap().candidates;
+        assert_eq!(candidates, ["{"]);
     }
 
     fn assert_candidates(input: &str, ty: &Type, expected: &[&str]) {

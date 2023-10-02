@@ -4,11 +4,11 @@
 #![deny(missing_docs)]
 
 pub mod fmt;
+pub mod func;
 pub mod parser;
 pub mod value;
 pub mod writer;
 
-mod func;
 mod lex;
 mod ty;
 mod val;
@@ -19,7 +19,6 @@ pub mod completion;
 /// Implementations for [`wasmtime`] types.
 pub mod wasmtime;
 
-pub use func::WasmFunc;
 pub use ty::{WasmType, WasmTypeKind};
 pub use val::WasmValue;
 

@@ -1,13 +1,16 @@
 use std::borrow::Cow;
 
+use wasmtime::component;
+
 use crate::{
-    fmt::FuncDebug,
+    fmt::DisplayFunc,
+    func::WasmFunc,
     ty::{maybe_unwrap, WasmTypeKind},
     val::unwrap_val,
-    WasmFunc, WasmType, WasmValue,
+    WasmType, WasmValue,
 };
 
-impl WasmType for wasmtime::component::Type {
+impl WasmType for component::Type {
     fn kind(&self) -> WasmTypeKind {
         match self {
             Self::Bool => WasmTypeKind::Bool,
@@ -99,8 +102,8 @@ macro_rules! impl_primitives {
     };
 }
 
-impl WasmValue for wasmtime::component::Val {
-    type Type = wasmtime::component::Type;
+impl WasmValue for component::Val {
+    type Type = component::Type;
     type Error = wasmtime::Error;
 
     fn ty(&self) -> Self::Type {
@@ -208,13 +211,13 @@ impl WasmValue for wasmtime::component::Val {
 #[derive(Clone)]
 pub struct FuncType {
     /// The func's parameters.
-    pub params: Box<[wasmtime::component::Type]>,
+    pub params: Box<[component::Type]>,
     /// The func's results.
-    pub results: Box<[wasmtime::component::Type]>,
+    pub results: Box<[component::Type]>,
 }
 
 impl WasmFunc for FuncType {
-    type Type = wasmtime::component::Type;
+    type Type = component::Type;
 
     fn params(&self) -> Box<dyn Iterator<Item = Self::Type> + '_> {
         Box::new(self.params.iter().cloned())
@@ -225,19 +228,16 @@ impl WasmFunc for FuncType {
     }
 }
 
-impl std::fmt::Debug for FuncType {
+impl std::fmt::Display for FuncType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        FuncDebug(self.clone()).fmt(f)
+        DisplayFunc(self.clone()).fmt(f)
     }
 }
 
 /// Returns a [`FuncType`] for the given `func` and `store`.
 /// # Panics
-/// Panics if `func` didn't come from `store`.
-pub fn get_func_type(
-    func: &wasmtime::component::Func,
-    store: &impl wasmtime::AsContext,
-) -> FuncType {
+/// Panics if `func` doesn't belong to `store`.
+pub fn get_func_type(func: &component::Func, store: &impl wasmtime::AsContext) -> FuncType {
     FuncType {
         params: func.params(store),
         results: func.results(store),

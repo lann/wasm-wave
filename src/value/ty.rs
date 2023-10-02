@@ -6,7 +6,7 @@ use crate::{
 };
 
 /// The [`WasmType`] of a [`Value`](super::Value).
-#[derive(Clone, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 #[allow(missing_docs)]
 pub enum Type {
     Simple(SimpleType),
@@ -261,8 +261,8 @@ impl WasmType for Type {
     }
 }
 
-impl std::fmt::Debug for Type {
+impl std::fmt::Display for Type {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        crate::fmt::TypeDebug(self.clone()).fmt(f)
+        crate::fmt::DisplayType(self.clone()).fmt(f)
     }
 }

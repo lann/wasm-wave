@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use crate::{ty::WasmTypeKind, val::unwrap_val, WasmFunc, WasmType, WasmValue};
+use crate::{func::WasmFunc, ty::WasmTypeKind, val::unwrap_val, WasmType, WasmValue};
 
 impl WasmType for wasmtime::ValType {
     fn kind(&self) -> WasmTypeKind {
