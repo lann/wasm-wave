@@ -269,7 +269,7 @@ mod tests {
     }
 
     #[test]
-    fn test_bare_string_param_completion() {
+    fn test_flat_string_param_completion() {
         let params = [Type::option(Type::STRING)];
         let candidates = params_completions(params, "(\"\\u").unwrap().candidates;
         assert_eq!(candidates, ["{"]);

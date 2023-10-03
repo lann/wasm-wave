@@ -764,7 +764,7 @@ mod tests {
     }
 
     #[test]
-    fn parse_bare_option_or_result() {
+    fn parse_flat_option_or_result() {
         let ty = Type::option(Type::BOOL);
         assert_eq!(
             parse_value("true", &ty),

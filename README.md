@@ -15,8 +15,8 @@ WAVE is a human-oriented text encoding of WebAssembly Component Model values. It
 |Records|`{field-a: 1, field-b: "two"}`
 |Variants|`days(30)`, `forever`
 |Enums|`south`, `west`
-|Options|`"bare some"`, `some("explicit some")`, `none`
-|Results|`"bare ok"`, `ok("explicit ok")`, `err("oops")`
+|Options|`"flat some"`, `some("explicit some")`, `none`
+|Results|`"flat ok"`, `ok("explicit ok")`, `err("oops")`
 |Flags|`{read, write}`, `{}`
 
 ## Usage
@@ -117,7 +117,7 @@ Enums are encoded as a case label.
 
 Options may be encoded in their variant form
 (e.g. `some(1)` or `none`). A `some` value may also be
-encoded as the "bare" payload value itself, but only if
+encoded as the "flat" payload value itself, but only if
 the payload is not an option, result, variant, or enum type<sup>†</sup>.
 
 - `option<u8>` → `123` = `some(123)`
@@ -127,7 +127,7 @@ the payload is not an option, result, variant, or enum type<sup>†</sup>.
 
 Results may be encoded in their variant form
 (e.g. `ok(1)`, `err("oops")`). An `ok` value may also be
-encoded as the "bare" payload value itself, but only if
+encoded as the "flat" payload value itself, but only if
 it has a payload and the payload is not an option, result, variant, or enum type<sup>†</sup>.
 
 - `result<u8>` → `123` = `ok(123)`
@@ -186,7 +186,7 @@ Results are encoded in one of several ways depending on the number of result val
 
 - Any number of result values may be encoded as a parenthesized sequence of comma-separated result entries. Each result entry consists of a label (for named results) or zero-based index number, a colon, and the result value. Result entry ordering must match the function definition.
 - Zero result values are encoded as `()` or omitted entirely.
-- A single result value may be encoded as the "bare" result value itself.
+- A single result value may be encoded as the "flat" result value itself.
 
 ```clike
 -> ()
@@ -200,6 +200,6 @@ Results are encoded in one of several ways depending on the number of result val
 
 ---
 
-<sup>†</sup> These payload type restrictions on "bare" `option` `some`  and `result` `ok` encodings simplify parsing and prevent ambiguity where a payload value encoding "looks like" the outer value, e.g. an `enum` with a `none` case or a `variant` with an `ok` case. While it may seem that this restriction could be loosened to only exclude types that actually have such an ambiguous case name, a subtype-compatible change to the payload type could cause previously-encoded data to become ambiguous retroactively.
+<sup>†</sup> These payload type restrictions on "flat" `option` `some`  and `result` `ok` encodings simplify parsing and prevent ambiguity where a payload value encoding "looks like" the outer value, e.g. an `enum` with a `none` case or a `variant` with an `ok` case. While it may seem that this restriction could be loosened to only exclude types that actually have such an ambiguous case name, a subtype-compatible change to the payload type could cause previously-encoded data to become ambiguous retroactively.
 
 :ocean:
