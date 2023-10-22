@@ -1,6 +1,6 @@
 //! Web Assembly Value Encoding writer.
 
-use std::{borrow::Borrow, fmt::Debug, io::Write};
+use std::{fmt::Debug, io::Write};
 
 use thiserror::Error;
 
@@ -27,7 +27,6 @@ impl<W: Write> Writer<W> {
     where
         V: WasmValue,
     {
-        let val = val.borrow();
         let ty = val.ty();
         match ty.kind() {
             crate::ty::WasmTypeKind::Bool => {
