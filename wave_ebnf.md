@@ -36,8 +36,7 @@ string-char ::= common-char | [']
 common-char ::= <any Unicode Scalar Value except ['"\]>
               | '\' escape
 escape ::= ['"tnr\] | escape-unicode
-escape-unicode ::= 'u{' hex-digit+ '}'
-hex-digit ::= [0-9a-fA-F]
+escape-unicode ::= 'u{' [0-9a-fA-F]+ '}'
 
 variant-case ::= label case-payload?
 variant-case-payload ::= '(' value-ws ')'
