@@ -1,15 +1,14 @@
 # WAVE EBNF
 
-A WAVE value is defined by the `value` rule below. Many applications will allow
+A WAVE value is defined by the `value` rule below. Many applications may allow
 whitespace around the value, equivalent to the `value-ws` rule.
 
-> Note that this combines Bool, Variant, Enum, Option and Result values under
-> the `variant-case` rule because these cannot be disambiguated without type
+> Note that Bool, Variant, Enum, Option and Result values are combined under
+> the `variant-case` rule because these cannot be distinguished without type
 > information.
 
 ```ebnf
-value ::= int
-        | float
+value ::= number
         | char
         | string
         | variant-case
@@ -18,18 +17,17 @@ value ::= int
         | flags
         | record
 
-int ::= uint
-      | '-' uint
-uint ::= '0'
-       | [1-9] [0-9]*
-
-float ::= float_finite
-        | 'nan'
-        | 'inf'
-        | '-inf'
-float_finite ::= int float_decimal? float_exponent?
-float_decimal ::= '.' [0-9]+
-float_exponent ::= [eE] [+-]? uint
+number ::= number_finite
+         | 'nan'
+         | 'inf'
+         | '-inf'
+number_finite ::= integer number-fraction? number-exponent?
+integer ::= unsigned-integer
+          | '-' unsigned-integer
+unsigned-integer ::= '0'
+                   | [1-9] [0-9]*
+number-fraction ::= '.' [0-9]+
+number-exponent ::= [eE] [+-]? unsigned-integer
 
 char ::= ['] char-inner [']
 char-char ::= common-char | '"'
