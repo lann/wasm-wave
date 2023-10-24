@@ -59,7 +59,6 @@ values-seq ::= value-ws
 value-ws ::= ws value ws
 ws ::= <Unicode WS>*
 
-
 label ::= word
        | label '-' word
 word ::= [a-z][a-z0-9]*
