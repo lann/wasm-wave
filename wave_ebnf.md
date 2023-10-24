@@ -38,7 +38,7 @@ common-char ::= <any Unicode Scalar Value except ['"\]>
 escape ::= ['"tnr\] | escape-unicode
 escape-unicode ::= 'u{' [0-9a-fA-F]+ '}'
 
-variant-case ::= label case-payload?
+variant-case ::= label variant-case-payload?
 variant-case-payload ::= '(' value-ws ')'
 
 tuple ::= '(' values-seq ','? ')'
