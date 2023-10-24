@@ -3,20 +3,20 @@
 A WAVE value is defined by the `value` rule below. Many applications will allow
 whitespace around the value, equivalent to the `value-ws` rule.
 
+> Note that this combines Bool, Variant, Enum, Option and Result values under
+> the `variant-case` rule because these cannot be disambiguated without type
+> information.
+
 ```ebnf
-value ::= bool
-        | int
+value ::= int
         | float
         | char
         | string
-        | case
+        | variant-case
         | tuple
         | list
         | flags
         | record
-
-bool ::= 'true'
-       | 'false'
 
 int ::= uint
       | '-' uint
@@ -35,15 +35,14 @@ char ::= ['] char-inner [']
 char-char ::= common-char | '"'
 string ::= '"' string-inner* '"'
 string-char ::= common-char | [']
-common-char ::= <UTF-8-encoded Unicode Scalar Value except ['"\]>
+common-char ::= <any Unicode Scalar Value except ['"\]>
               | '\' escape
 escape ::= ['"tnr\] | escape-unicode
-// escape-unicode must identify a valid Unicode scalar value
 escape-unicode ::= 'u{' hex-digit+ '}'
 hex-digit ::= [0-9a-fA-F]
 
-case ::= label case-payload?
-case-payload ::= '(' value-ws ')'
+variant-case ::= label case-payload?
+variant-case-payload ::= '(' value-ws ')'
 
 tuple ::= '(' values-seq ','? ')'
 
@@ -70,5 +69,6 @@ word ::= [a-z][a-z0-9]*
        | [A-Z][A-Z0-9]*
 ```
 
-* "`Unicode scalar value`" and "`UTF-8`" are as defined by Unicode
+* "`Unicode scalar value`" is defined by Unicode
 * "`Unicode WS`" is any Unicode character with property `White_Space=yes`
+* `escape-unicode` must identify a valid Unicode scalar value.
