@@ -29,10 +29,10 @@ unsigned-integer ::= '0'
 number-fraction ::= '.' [0-9]+
 number-exponent ::= [eE] [+-]? unsigned-integer
 
-char ::= ['] char-inner [']
+char ::= ['] char-char [']
 char-char ::= common-char | '"'
 
-string ::= '"' string-inner* '"'
+string ::= '"' string-char* '"'
 string-char ::= common-char | [']
 
 common-char ::= <any Unicode Scalar Value except ['"\]>
