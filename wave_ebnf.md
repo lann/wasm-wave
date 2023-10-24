@@ -31,8 +31,10 @@ number-exponent ::= [eE] [+-]? unsigned-integer
 
 char ::= ['] char-inner [']
 char-char ::= common-char | '"'
+
 string ::= '"' string-inner* '"'
 string-char ::= common-char | [']
+
 common-char ::= <any Unicode Scalar Value except ['"\]>
               | '\' escape
 escape ::= ['"tnr\] | escape-unicode
