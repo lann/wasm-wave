@@ -18,7 +18,7 @@ value ::= number
         | record
 
 value-ws ::= ws value ws
-ws ::= <Unicode WS>*
+ws ::= <Unicode whitespace>*
 
 number ::= number_finite
          | 'nan'
@@ -69,5 +69,5 @@ word ::= [a-z][a-z0-9]*
 ```
 
 * "`Unicode scalar value`" is defined by Unicode
-* "`Unicode WS`" is any Unicode character with property `White_Space=yes`
+* "`Unicode whitespace`" is any Unicode character with property `White_Space=yes`
 * `escape-unicode` must identify a valid Unicode scalar value.
