@@ -17,6 +17,9 @@ value ::= number
         | flags
         | record
 
+value-ws ::= ws value ws
+ws ::= <Unicode WS>*
+
 number ::= number_finite
          | 'nan'
          | 'inf'
@@ -47,6 +50,9 @@ tuple ::= '(' values-seq ','? ')'
 
 list ::= '[' values-seq ','? ']'
 
+values-seq ::= value-ws
+             | values ',' values-ws
+
 flags ::= '{' flags-seq ','? '}'
 flags-seq ::= ws label ws
             | flags-seq ',' label
@@ -55,11 +61,6 @@ record ::= '{' record-fields ','? '}'
 record-fields ::= ws record-field ws
                 | record-fields ',' record-field
 record-field ::= label ws ':' ws value
-
-values-seq ::= value-ws
-             | values ',' values-ws
-value-ws ::= ws value ws
-ws ::= <Unicode WS>*
 
 label ::= word
        | label '-' word
