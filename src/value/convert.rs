@@ -1,4 +1,4 @@
-use crate::{ty::WasmTypeKind, WasmType, WasmValue};
+use crate::{ty::WasmTypeKind, value::ValueEnum, WasmType, WasmValue};
 
 use super::{Type, Value};
 
@@ -56,7 +56,7 @@ macro_rules! impl_primitives {
 
             impl From<$ty> for $Self {
                 fn from(value: $ty) -> Self {
-                    Self::$case(value)
+                    Self(ValueEnum::$case(value))
                 }
             }
         )*
@@ -87,7 +87,7 @@ impl ValueTyped for String {
 
 impl From<String> for Value {
     fn from(value: String) -> Self {
-        Self::String(value.into())
+        Self(ValueEnum::String(value.into()))
     }
 }
 

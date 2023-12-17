@@ -288,7 +288,7 @@ pub trait WasmValue: Clone + Sized {
 }
 
 macro_rules! unwrap_val {
-    ($val:ident, $case:path, $name:expr) => {
+    ($val:expr, $case:path, $name:expr) => {
         match $val {
             $case(v) => v,
             _ => panic!("called unwrap_{name} on non-{name} value", name = $name),
