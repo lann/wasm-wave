@@ -796,12 +796,12 @@ mod tests {
         let ty = Type::option(Type::BOOL);
         assert_eq!(
             parse_value("true", &ty),
-            Value::make_option(&ty, Some(Value::Bool(true))).unwrap()
+            Value::make_option(&ty, Some(Value::make_bool(true))).unwrap()
         );
         let ty = Type::result(Some(Type::BOOL), None);
         assert_eq!(
             parse_value("false", &ty),
-            Value::make_result(&ty, Ok(Some(Value::Bool(false)))).unwrap()
+            Value::make_result(&ty, Ok(Some(Value::make_bool(false)))).unwrap()
         );
     }
 

@@ -7,8 +7,10 @@ use crate::{
 
 /// The [`WasmType`] of a [`Value`](super::Value).
 #[derive(Clone, Debug, PartialEq)]
-#[allow(missing_docs)]
-pub enum Type {
+pub struct Type(pub(super) TypeEnum);
+
+#[derive(Clone, Debug, PartialEq)]
+pub(super) enum TypeEnum {
     Simple(SimpleType),
     List(Arc<ListType>),
     Record(Arc<RecordType>),
@@ -39,7 +41,7 @@ impl Type {
     /// Returns the simple type of the given `kind`. Returns None if the kind
     /// represents a parameterized type.
     pub fn simple(kind: WasmTypeKind) -> Option<Self> {
-        is_simple(kind).then_some(Self::Simple(SimpleType(kind)))
+        is_simple(kind).then_some(Self(TypeEnum::Simple(SimpleType(kind))))
     }
 
     #[doc(hidden)]
@@ -47,13 +49,13 @@ impl Type {
         if !is_simple(kind) {
             panic!("kind is not simple");
         }
-        Self::Simple(SimpleType(kind))
+        Self(TypeEnum::Simple(SimpleType(kind)))
     }
 
     /// Returns a list type with the given element type.
     pub fn list(element_type: impl Into<Self>) -> Self {
         let element = element_type.into();
-        Self::List(Arc::new(ListType { element }))
+        Self(TypeEnum::List(Arc::new(ListType { element })))
     }
 
     /// Returns a record type with the given field types. Returns None if
@@ -68,7 +70,7 @@ impl Type {
         if fields.is_empty() {
             return None;
         }
-        Some(Self::Record(Arc::new(RecordType { fields })))
+        Some(Self(TypeEnum::Record(Arc::new(RecordType { fields }))))
     }
 
     /// Returns a tuple type with the given element types. Returns None if
@@ -78,7 +80,7 @@ impl Type {
         if elements.is_empty() {
             return None;
         }
-        Some(Self::Tuple(Arc::new(TupleType { elements })))
+        Some(Self(TypeEnum::Tuple(Arc::new(TupleType { elements }))))
     }
 
     /// Returns a variant type with the given case names and optional payloads.
@@ -93,7 +95,7 @@ impl Type {
         if cases.is_empty() {
             return None;
         }
-        Some(Self::Variant(Arc::new(VariantType { cases })))
+        Some(Self(TypeEnum::Variant(Arc::new(VariantType { cases }))))
     }
 
     /// Returns an enum type with the given case names. Returns None if `cases`
@@ -103,17 +105,17 @@ impl Type {
         if cases.is_empty() {
             return None;
         }
-        Some(Self::Enum(Arc::new(EnumType { cases })))
+        Some(Self(TypeEnum::Enum(Arc::new(EnumType { cases }))))
     }
 
     /// Returns an option type with the given "some" type.
     pub fn option(some: Self) -> Self {
-        Self::Option(Arc::new(OptionType { some }))
+        Self(TypeEnum::Option(Arc::new(OptionType { some })))
     }
 
     /// Returns a result type with the given optional "ok" and "err" payloads.
     pub fn result(ok: Option<Self>, err: Option<Self>) -> Self {
-        Self::Result(Arc::new(ResultType { ok, err }))
+        Self(TypeEnum::Result(Arc::new(ResultType { ok, err })))
     }
 
     /// Returns a flags type with the given flag names. Returns None if `flags`
@@ -123,7 +125,7 @@ impl Type {
         if flags.is_empty() {
             return None;
         }
-        Some(Self::Flags(Arc::new(FlagsType { flags })))
+        Some(Self(TypeEnum::Flags(Arc::new(FlagsType { flags }))))
     }
 
     /// Returns a [`Type`] matching the given [`WasmType`]. Returns None if the
@@ -187,26 +189,26 @@ pub struct FlagsType {
 
 impl WasmType for Type {
     fn kind(&self) -> WasmTypeKind {
-        match self {
-            Type::Simple(simple) => simple.0,
-            Type::List(_) => WasmTypeKind::List,
-            Type::Record(_) => WasmTypeKind::Record,
-            Type::Tuple(_) => WasmTypeKind::Tuple,
-            Type::Variant(_) => WasmTypeKind::Variant,
-            Type::Enum(_) => WasmTypeKind::Enum,
-            Type::Option(_) => WasmTypeKind::Option,
-            Type::Result(_) => WasmTypeKind::Result,
-            Type::Flags(_) => WasmTypeKind::Flags,
+        match self.0 {
+            TypeEnum::Simple(simple) => simple.0,
+            TypeEnum::List(_) => WasmTypeKind::List,
+            TypeEnum::Record(_) => WasmTypeKind::Record,
+            TypeEnum::Tuple(_) => WasmTypeKind::Tuple,
+            TypeEnum::Variant(_) => WasmTypeKind::Variant,
+            TypeEnum::Enum(_) => WasmTypeKind::Enum,
+            TypeEnum::Option(_) => WasmTypeKind::Option,
+            TypeEnum::Result(_) => WasmTypeKind::Result,
+            TypeEnum::Flags(_) => WasmTypeKind::Flags,
         }
     }
 
     fn list_element_type(&self) -> Option<Self> {
-        let list = maybe_unwrap!(self, Self::List)?;
+        let list = maybe_unwrap!(&self.0, TypeEnum::List)?;
         Some(list.element.clone())
     }
 
     fn record_fields(&self) -> Box<dyn Iterator<Item = (Cow<str>, Self)> + '_> {
-        let Self::Record(record) = self else {
+        let TypeEnum::Record(record) = &self.0 else {
             return Box::new(std::iter::empty());
         };
         Box::new(
@@ -218,14 +220,14 @@ impl WasmType for Type {
     }
 
     fn tuple_element_types(&self) -> Box<dyn Iterator<Item = Self> + '_> {
-        let Self::Tuple(tuple) = self else {
+        let TypeEnum::Tuple(tuple) = &self.0 else {
             return Box::new(std::iter::empty());
         };
         Box::new(tuple.elements.iter().cloned())
     }
 
     fn variant_cases(&self) -> Box<dyn Iterator<Item = (Cow<str>, Option<Self>)> + '_> {
-        let Self::Variant(variant) = self else {
+        let TypeEnum::Variant(variant) = &self.0 else {
             return Box::new(std::iter::empty());
         };
         Box::new(
@@ -237,24 +239,24 @@ impl WasmType for Type {
     }
 
     fn enum_cases(&self) -> Box<dyn Iterator<Item = Cow<str>> + '_> {
-        let Self::Enum(enum_) = self else {
+        let TypeEnum::Enum(enum_) = &self.0 else {
             return Box::new(std::iter::empty());
         };
         Box::new(enum_.cases.iter().map(|name| name.as_ref().into()))
     }
 
     fn option_some_type(&self) -> Option<Self> {
-        let option = maybe_unwrap!(self, Self::Option)?;
+        let option = maybe_unwrap!(&self.0, TypeEnum::Option)?;
         Some(option.some.clone())
     }
 
     fn result_types(&self) -> Option<(Option<Self>, Option<Self>)> {
-        let result = maybe_unwrap!(self, Self::Result)?;
+        let result = maybe_unwrap!(&self.0, TypeEnum::Result)?;
         Some((result.ok.clone(), result.err.clone()))
     }
 
     fn flags_names(&self) -> Box<dyn Iterator<Item = Cow<str>> + '_> {
-        let Self::Flags(flags) = self else {
+        let TypeEnum::Flags(flags) = &self.0 else {
             return Box::new(std::iter::empty());
         };
         Box::new(flags.flags.iter().map(|name| name.as_ref().into()))

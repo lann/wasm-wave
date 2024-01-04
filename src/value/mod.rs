@@ -15,17 +15,20 @@ pub use wit::{resolve_wit_func_type, resolve_wit_type};
 use std::{borrow::Cow, collections::HashMap, sync::Arc};
 
 use self::ty::{
-    EnumType, FlagsType, ListType, OptionType, RecordType, ResultType, TupleType, VariantType,
+    EnumType, FlagsType, ListType, OptionType, RecordType, ResultType, TupleType, TypeEnum,
+    VariantType,
 };
 use crate::{ty::maybe_unwrap, val::unwrap_val, WasmType, WasmValue};
 
 pub use func::FuncType;
 pub use ty::Type;
 
-/// A Value is a WAVE value.
+/// A Value is a WAVE value, and implements [`WasmValue`].
 #[derive(Debug, Clone, PartialEq)]
-#[allow(missing_docs)]
-pub enum Value {
+pub struct Value(ValueEnum);
+
+#[derive(Debug, Clone, PartialEq)]
+pub(super) enum ValueEnum {
     Bool(bool),
     S8(i8),
     U8(u8),
@@ -110,11 +113,11 @@ macro_rules! impl_primitives {
     ($Self:ident, $(($case:ident, $ty:ty, $make:ident, $unwrap:ident)),*) => {
         $(
             fn $make(val: $ty) -> $Self {
-                $Self::$case(val)
+                $Self(ValueEnum::$case(val))
             }
 
             fn $unwrap(&self) -> $ty {
-                *unwrap_val!(self, $Self::$case, stringify!($case))
+                *unwrap_val!(&self.0, ValueEnum::$case, stringify!($case))
             }
         )*
     };
@@ -126,28 +129,28 @@ impl WasmValue for Value {
     type Error = ValueError;
 
     fn ty(&self) -> Self::Type {
-        match self {
-            Self::Bool(_) => Type::BOOL,
-            Self::S8(_) => Type::S8,
-            Self::S16(_) => Type::S16,
-            Self::S32(_) => Type::S32,
-            Self::S64(_) => Type::S64,
-            Self::U8(_) => Type::U8,
-            Self::U16(_) => Type::U16,
-            Self::U32(_) => Type::U32,
-            Self::U64(_) => Type::U64,
-            Self::Float32(_) => Type::FLOAT32,
-            Self::Float64(_) => Type::FLOAT64,
-            Self::Char(_) => Type::CHAR,
-            Self::String(_) => Type::STRING,
-            Self::List(inner) => Type::List(inner.ty.clone()),
-            Self::Record(inner) => Type::Record(inner.ty.clone()),
-            Self::Tuple(inner) => Type::Tuple(inner.ty.clone()),
-            Self::Variant(inner) => Type::Variant(inner.ty.clone()),
-            Self::Enum(inner) => Type::Enum(inner.ty.clone()),
-            Self::Option(inner) => Type::Option(inner.ty.clone()),
-            Self::Result(inner) => Type::Result(inner.ty.clone()),
-            Self::Flags(inner) => Type::Flags(inner.ty.clone()),
+        match &self.0 {
+            ValueEnum::Bool(_) => Type::BOOL,
+            ValueEnum::S8(_) => Type::S8,
+            ValueEnum::S16(_) => Type::S16,
+            ValueEnum::S32(_) => Type::S32,
+            ValueEnum::S64(_) => Type::S64,
+            ValueEnum::U8(_) => Type::U8,
+            ValueEnum::U16(_) => Type::U16,
+            ValueEnum::U32(_) => Type::U32,
+            ValueEnum::U64(_) => Type::U64,
+            ValueEnum::Float32(_) => Type::FLOAT32,
+            ValueEnum::Float64(_) => Type::FLOAT64,
+            ValueEnum::Char(_) => Type::CHAR,
+            ValueEnum::String(_) => Type::STRING,
+            ValueEnum::List(inner) => Type(TypeEnum::List(inner.ty.clone())),
+            ValueEnum::Record(inner) => Type(TypeEnum::Record(inner.ty.clone())),
+            ValueEnum::Tuple(inner) => Type(TypeEnum::Tuple(inner.ty.clone())),
+            ValueEnum::Variant(inner) => Type(TypeEnum::Variant(inner.ty.clone())),
+            ValueEnum::Enum(inner) => Type(TypeEnum::Enum(inner.ty.clone())),
+            ValueEnum::Option(inner) => Type(TypeEnum::Option(inner.ty.clone())),
+            ValueEnum::Result(inner) => Type(TypeEnum::Result(inner.ty.clone())),
+            ValueEnum::Flags(inner) => Type(TypeEnum::Flags(inner.ty.clone())),
         }
     }
 
@@ -168,7 +171,7 @@ impl WasmValue for Value {
     );
 
     fn make_string(val: std::borrow::Cow<str>) -> Self {
-        Self::String(val.into())
+        Self(ValueEnum::String(val.into()))
     }
 
     fn make_list(
@@ -182,8 +185,8 @@ impl WasmValue for Value {
             .into_iter()
             .map(|v| check_type(&element_type, v))
             .collect::<Result<_, ValueError>>()?;
-        let ty = maybe_unwrap!(ty, Type::List).unwrap().clone();
-        Ok(Self::List(List { ty, elements }))
+        let ty = maybe_unwrap!(&ty.0, TypeEnum::List).unwrap().clone();
+        Ok(Self(ValueEnum::List(List { ty, elements })))
     }
 
     fn make_record<'a>(
@@ -206,8 +209,8 @@ impl WasmValue for Value {
         if let Some(unknown) = field_vals.into_keys().next() {
             return Err(ValueError::MissingField(unknown.into()));
         }
-        let ty = maybe_unwrap!(ty, Type::Record).unwrap().clone();
-        Ok(Self::Record(Record { ty, fields }))
+        let ty = maybe_unwrap!(&ty.0, TypeEnum::Record).unwrap().clone();
+        Ok(Self(ValueEnum::Record(Record { ty, fields })))
     }
 
     fn make_tuple(
@@ -232,8 +235,8 @@ impl WasmValue for Value {
                 elements.len()
             )));
         }
-        let ty = maybe_unwrap!(ty, Type::Tuple).unwrap().clone();
-        Ok(Self::Tuple(Tuple { ty, elements }))
+        let ty = maybe_unwrap!(&ty.0, TypeEnum::Tuple).unwrap().clone();
+        Ok(Self(ValueEnum::Tuple(Tuple { ty, elements })))
     }
 
     fn make_variant(ty: &Self::Type, case: &str, val: Option<Self>) -> Result<Self, Self::Error> {
@@ -243,8 +246,8 @@ impl WasmValue for Value {
             .find_map(|(idx, (name, ty))| (name == case).then_some((idx, ty)))
             .ok_or_else(|| ValueError::InvalidValue(format!("unknown case `{case}` for {ty:?}")))?;
         let payload = check_option_type(&payload_type, val)?;
-        let ty = maybe_unwrap!(ty, Type::Variant).unwrap().clone();
-        Ok(Self::Variant(Variant { ty, case, payload }))
+        let ty = maybe_unwrap!(&ty.0, TypeEnum::Variant).unwrap().clone();
+        Ok(Self(ValueEnum::Variant(Variant { ty, case, payload })))
     }
 
     fn make_enum(ty: &Self::Type, case: &str) -> Result<Self, Self::Error> {
@@ -252,8 +255,8 @@ impl WasmValue for Value {
             .enum_cases()
             .position(|name| name == case)
             .ok_or_else(|| ValueError::InvalidValue(format!("unknown case `{case}` for {ty:?}")))?;
-        let ty = maybe_unwrap!(ty, Type::Enum).unwrap().clone();
-        Ok(Self::Enum(Enum { ty, case }))
+        let ty = maybe_unwrap!(&ty.0, TypeEnum::Enum).unwrap().clone();
+        Ok(Self(ValueEnum::Enum(Enum { ty, case })))
     }
 
     fn make_option(ty: &Self::Type, val: Option<Self>) -> Result<Self, Self::Error> {
@@ -263,8 +266,8 @@ impl WasmValue for Value {
         let value = val
             .map(|val| Ok(Box::new(check_type(&some_type, val)?)))
             .transpose()?;
-        let ty = maybe_unwrap!(ty, Type::Option).unwrap().clone();
-        Ok(Self::Option(OptionValue { ty, value }))
+        let ty = maybe_unwrap!(&ty.0, TypeEnum::Option).unwrap().clone();
+        Ok(Self(ValueEnum::Option(OptionValue { ty, value })))
     }
 
     fn make_result(
@@ -278,8 +281,8 @@ impl WasmValue for Value {
             Ok(ok) => Ok(check_option_type(&ok_type, ok)?),
             Err(err) => Err(check_option_type(&err_type, err)?),
         };
-        let ty = maybe_unwrap!(ty, Type::Result).unwrap().clone();
-        Ok(Self::Result(ResultValue { ty, value }))
+        let ty = maybe_unwrap!(&ty.0, TypeEnum::Result).unwrap().clone();
+        Ok(Self(ValueEnum::Result(ResultValue { ty, value })))
     }
 
     fn make_flags<'a>(
@@ -296,19 +299,21 @@ impl WasmValue for Value {
                     .ok_or_else(|| ValueError::InvalidValue(format!("unknown flag `{name}`")))
             })
             .collect::<Result<Vec<_>, ValueError>>()?;
-        let ty = maybe_unwrap!(ty, Type::Flags).unwrap().clone();
-        Ok(Self::Flags(Flags { ty, flags }))
+        let ty = maybe_unwrap!(&ty.0, TypeEnum::Flags).unwrap().clone();
+        Ok(Self(ValueEnum::Flags(Flags { ty, flags })))
     }
 
     fn unwrap_string(&self) -> std::borrow::Cow<str> {
-        unwrap_val!(self, Self::String, "string").as_ref().into()
+        unwrap_val!(&self.0, ValueEnum::String, "string")
+            .as_ref()
+            .into()
     }
     fn unwrap_list(&self) -> Box<dyn Iterator<Item = Cow<Self>> + '_> {
-        let list = unwrap_val!(self, Self::List, "list");
+        let list = unwrap_val!(&self.0, ValueEnum::List, "list");
         Box::new(list.elements.iter().map(cow))
     }
     fn unwrap_record(&self) -> Box<dyn Iterator<Item = (Cow<str>, Cow<Self>)> + '_> {
-        let record = unwrap_val!(self, Self::Record, "record");
+        let record = unwrap_val!(&self.0, ValueEnum::Record, "record");
         Box::new(
             record
                 .ty
@@ -319,32 +324,32 @@ impl WasmValue for Value {
         )
     }
     fn unwrap_tuple(&self) -> Box<dyn Iterator<Item = Cow<Self>> + '_> {
-        let tuple = unwrap_val!(self, Self::Tuple, "tuple");
+        let tuple = unwrap_val!(&self.0, ValueEnum::Tuple, "tuple");
         Box::new(tuple.elements.iter().map(cow))
     }
     fn unwrap_variant(&self) -> (Cow<str>, Option<Cow<Self>>) {
-        let variant = unwrap_val!(self, Self::Variant, "variant");
+        let variant = unwrap_val!(&self.0, ValueEnum::Variant, "variant");
         let (ref name, _) = variant.ty.cases[variant.case];
         (cow(name.as_ref()), variant.payload.as_deref().map(cow))
     }
     fn unwrap_enum(&self) -> Cow<str> {
-        let enum_ = unwrap_val!(self, Self::Enum, "enum");
+        let enum_ = unwrap_val!(&self.0, ValueEnum::Enum, "enum");
         cow(enum_.ty.cases[enum_.case].as_ref())
     }
     fn unwrap_option(&self) -> Option<Cow<Self>> {
-        unwrap_val!(self, Self::Option, "option")
+        unwrap_val!(&self.0, ValueEnum::Option, "option")
             .value
             .as_ref()
             .map(|v| cow(v.as_ref()))
     }
     fn unwrap_result(&self) -> Result<Option<Cow<Self>>, Option<Cow<Self>>> {
-        match &unwrap_val!(self, Self::Result, "result").value {
+        match &unwrap_val!(&self.0, ValueEnum::Result, "result").value {
             Ok(val) => Ok(val.as_deref().map(cow)),
             Err(val) => Err(val.as_deref().map(cow)),
         }
     }
     fn unwrap_flags(&self) -> Box<dyn Iterator<Item = Cow<str>> + '_> {
-        let flags = unwrap_val!(self, Self::Flags, "flags");
+        let flags = unwrap_val!(&self.0, ValueEnum::Flags, "flags");
         Box::new(
             flags
                 .flags

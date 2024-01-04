@@ -5,17 +5,17 @@ use super::{Type, Value};
 #[test]
 fn simple_value_round_trips() {
     for val in [
-        Value::Bool(true),
-        Value::U8(u8::MAX),
-        Value::U16(u16::MAX),
-        Value::U32(u32::MAX),
-        Value::U64(u64::MAX),
-        Value::S8(i8::MIN),
-        Value::S16(i16::MIN),
-        Value::S32(i32::MIN),
-        Value::S64(i64::MIN),
-        Value::Char('☃'),
-        Value::String("str".into()),
+        Value::make_bool(true),
+        Value::make_u8(u8::MAX),
+        Value::make_u16(u16::MAX),
+        Value::make_u32(u32::MAX),
+        Value::make_u64(u64::MAX),
+        Value::make_s8(i8::MIN),
+        Value::make_s16(i16::MIN),
+        Value::make_s32(i32::MIN),
+        Value::make_s64(i64::MIN),
+        Value::make_char('☃'),
+        Value::make_string("str".into()),
     ] {
         test_value_round_trip(val)
     }
@@ -32,8 +32,8 @@ fn float_round_trips() {
         (f32::INFINITY, f64::INFINITY),
         (f32::NEG_INFINITY, f64::NEG_INFINITY),
     ] {
-        test_value_round_trip(Value::Float32(float32));
-        test_value_round_trip(Value::Float64(float64));
+        test_value_round_trip(Value::make_float32(float32));
+        test_value_round_trip(Value::make_float64(float64));
     }
 }
 
@@ -41,8 +41,8 @@ fn float_round_trips() {
 fn list_round_trips() {
     let ty = Type::list(Type::U8);
     test_value_round_trip(Value::make_list(&ty, []).unwrap());
-    test_value_round_trip(Value::make_list(&ty, [Value::U8(1)]).unwrap());
-    test_value_round_trip(Value::make_list(&ty, [Value::U8(1), Value::U8(2)]).unwrap());
+    test_value_round_trip(Value::make_list(&ty, [Value::make_u8(1)]).unwrap());
+    test_value_round_trip(Value::make_list(&ty, [Value::make_u8(1), Value::make_u8(2)]).unwrap());
 }
 
 #[test]
@@ -53,7 +53,7 @@ fn record_round_trip() {
     let record_val = Value::make_record(
         &record_ty,
         [
-            ("field-a", Value::Bool(true)),
+            ("field-a", Value::make_bool(true)),
             ("field-b", Value::make_option(&option_ty, None).unwrap()),
         ],
     )
@@ -64,7 +64,7 @@ fn record_round_trip() {
 #[test]
 fn tuple_round_trip() {
     let ty = Type::tuple([Type::BOOL, Type::U8]).unwrap();
-    let val = Value::make_tuple(&ty, [Value::Bool(true), Value::U8(1)]).unwrap();
+    let val = Value::make_tuple(&ty, [Value::make_bool(true), Value::make_u8(1)]).unwrap();
     test_value_round_trip(val);
 }
 
@@ -72,7 +72,7 @@ fn tuple_round_trip() {
 fn variant_round_trips() {
     let ty = Type::variant([("off", None), ("on", Some(Type::U8))]).unwrap();
     test_value_round_trip(Value::make_variant(&ty, "off", None).unwrap());
-    test_value_round_trip(Value::make_variant(&ty, "on", Some(Value::U8(1))).unwrap());
+    test_value_round_trip(Value::make_variant(&ty, "on", Some(Value::make_u8(1))).unwrap());
 }
 
 #[test]
@@ -85,7 +85,7 @@ fn enum_round_trips() {
 #[test]
 fn option_round_trips() {
     let ty = Type::option(Type::U8);
-    test_value_round_trip(Value::make_option(&ty, Some(Value::U8(1))).unwrap());
+    test_value_round_trip(Value::make_option(&ty, Some(Value::make_u8(1))).unwrap());
     test_value_round_trip(Value::make_option(&ty, None).unwrap());
 }
 
@@ -98,12 +98,12 @@ fn result_round_trips() {
     for (ty, payload) in [
         (&no_payloads, Ok(None)),
         (&no_payloads, Err(None)),
-        (&both_payloads, Ok(Some(Value::U8(1)))),
-        (&both_payloads, Err(Some(Value::String("oops".into())))),
-        (&ok_only, Ok(Some(Value::U8(1)))),
+        (&both_payloads, Ok(Some(Value::make_u8(1)))),
+        (&both_payloads, Err(Some(Value::make_string("oops".into())))),
+        (&ok_only, Ok(Some(Value::make_u8(1)))),
         (&ok_only, Err(None)),
         (&err_only, Ok(None)),
-        (&err_only, Err(Some(Value::String("oops".into())))),
+        (&err_only, Err(Some(Value::make_string("oops".into())))),
     ] {
         let val = Value::make_result(ty, payload).unwrap();
         test_value_round_trip(val);
