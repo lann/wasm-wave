@@ -152,6 +152,14 @@ impl<'a> Parser<'a> {
         }
     }
 
+    /// Return an error if we didn't reach the end of the input.
+    pub fn finish(&mut self) -> Result<(), ParserError> {
+        if let Some((token, _span)) = self.peek_next_non_whitespace() {
+            return Err(ParserError::UnexpectedTextAfterValue { got: Some(token) });
+        }
+        Ok(())
+    }
+
     fn parse_bool(&mut self) -> Result<bool, ParserError> {
         let names = [TRUE, FALSE];
         match self.expect_name(names)? {
@@ -681,6 +689,12 @@ pub enum ParserError {
         /// Got token type
         got: Option<Token>,
     },
+    /// Unexpected text after value
+    #[error("unexpected text after value")]
+    UnexpectedTextAfterValue {
+        /// Got token type
+        got: Option<Token>,
+    },
     /// Unsupported type (e.g. for a particular [`WasmValue`] impl)
     #[error("unsupported type {0}")]
     Unsupported(String),
@@ -760,6 +774,20 @@ mod tests {
             parse_unwrap::<Val>("(1234605616436508552,1311768467294899695)", ValType::V128)
                 .unwrap_v128(),
             0x1234567890abcdef1122334455667788
+        );
+    }
+
+    #[test]
+    fn parse_option_or_result() {
+        let ty = Type::option(Type::BOOL);
+        assert_eq!(
+            parse_value("some(true)", &ty),
+            Value::make_option(&ty, Some(Value::make_bool(true))).unwrap()
+        );
+        let ty = Type::result(Some(Type::BOOL), None);
+        assert_eq!(
+            parse_value("ok(false)", &ty),
+            Value::make_result(&ty, Ok(Some(Value::make_bool(false)))).unwrap()
         );
     }
 

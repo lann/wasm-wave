@@ -26,11 +26,58 @@ fn test_errors() {
     }
 }
 
+#[test]
+fn test_option_errors() {
+    for (func, input) in [
+        ("options", "(some, some(some(0)))"),
+        ("options", "(some(), some(some(0)))"),
+        ("options", "(some(0), some(some))"),
+        ("options", "(some(0), some(some()))"),
+        ("options", "(some(some(0)), some(some(0)))"),
+        ("options", "(some(0), some(some(some(0))))"),
+        ("options", "(none(), some(some(0)))"),
+        ("options", "(some(0), some(none()))"),
+        ("options", "(none(0), some(some(0)))"),
+        ("options", "(some(0), some(none(0)))"),
+        ("options", "(some(0), none(some(0)))"),
+    ] {
+        assert_reject(func, input);
+    }
+}
+
+#[test]
+fn test_result_errors() {
+    for (func, input) in [
+        ("result-ok-only", "ok"),
+        ("result-ok-only", "ok()"),
+        ("result-ok-only", "o(0)"),
+        ("result-ok-only", "err(0)"),
+        ("result-err-only", "err"),
+        ("result-err-only", "err()"),
+        ("result-err-only", "e(0)"),
+        ("result-err-only", "ok(0)"),
+        ("result-no-payloads", "ok()"),
+        ("result-no-payloads", "o(0)"),
+        ("result-no-payloads", "ok(0)"),
+        ("result-no-payloads", "err()"),
+        ("result-no-payloads", "e(0)"),
+        ("result-no-payloads", "err(0)"),
+        ("result-both-payloads", "ok"),
+        ("result-both-payloads", "ok()"),
+        ("result-both-payloads", "o(0)"),
+        ("result-both-payloads", "err"),
+        ("result-both-payloads", "err()"),
+        ("result-both-payloads", "e(0)"),
+    ] {
+        assert_reject(func, input);
+    }
+}
+
 fn assert_reject(type_name: &str, input: &str) {
     let ty = get_type(type_name);
     let result: Result<Val, wasm_wave::parser::ParserError> = wasm_wave::from_str(&ty, input);
     match result {
-        Ok(got) => panic!("failed to reject {input:?}; got '{got:?}'"),
+        Ok(got) => panic!("failed to reject {input:?} as type {type_name}; got '{got:?}'"),
         Err(err) => {
             dbg!(err);
         }
