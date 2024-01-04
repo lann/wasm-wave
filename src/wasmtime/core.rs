@@ -1,6 +1,9 @@
 use std::borrow::Cow;
 
-use crate::{func::WasmFunc, ty::WasmTypeKind, val::unwrap_val, WasmType, WasmValue};
+use crate::{
+    canonicalize_nan32, canonicalize_nan64, func::WasmFunc, ty::WasmTypeKind, val::unwrap_val,
+    WasmType, WasmValue,
+};
 
 impl WasmType for wasmtime::ValType {
     fn kind(&self) -> WasmTypeKind {
@@ -38,9 +41,11 @@ impl WasmValue for wasmtime::Val {
         Self::I64(val)
     }
     fn make_float32(val: f32) -> Self {
+        let val = canonicalize_nan32(val);
         Self::F32(val.to_bits())
     }
     fn make_float64(val: f64) -> Self {
+        let val = canonicalize_nan64(val);
         Self::F64(val.to_bits())
     }
     fn make_tuple(
@@ -71,11 +76,13 @@ impl WasmValue for wasmtime::Val {
     }
 
     fn unwrap_float32(&self) -> f32 {
-        f32::from_bits(*unwrap_val!(self, Self::F32, "float32"))
+        let val = f32::from_bits(*unwrap_val!(self, Self::F32, "float32"));
+        canonicalize_nan32(val)
     }
 
     fn unwrap_float64(&self) -> f64 {
-        f64::from_bits(*unwrap_val!(self, Self::F64, "float64"))
+        let val = f64::from_bits(*unwrap_val!(self, Self::F64, "float64"));
+        canonicalize_nan64(val)
     }
 
     fn unwrap_tuple(&self) -> Box<dyn Iterator<Item = Cow<Self>> + '_> {

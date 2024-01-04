@@ -58,3 +58,19 @@ pub fn to_string(val: &impl WasmValue) -> Result<String, writer::WriterError> {
     Writer::new(&mut buf).write_value(val)?;
     Ok(String::from_utf8(buf).unwrap_or_else(|err| panic!("invalid UTF-8: {err:?}")))
 }
+
+fn canonicalize_nan32(val: f32) -> f32 {
+    if val.is_nan() {
+        f32::from_bits(0x7fc00000)
+    } else {
+        val
+    }
+}
+
+fn canonicalize_nan64(val: f64) -> f64 {
+    if val.is_nan() {
+        f64::from_bits(0x7ff8000000000000)
+    } else {
+        val
+    }
+}

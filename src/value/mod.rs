@@ -18,6 +18,7 @@ use self::ty::{
     EnumType, FlagsType, ListType, OptionType, RecordType, ResultType, TupleType, TypeEnum,
     VariantType,
 };
+use crate::{canonicalize_nan32, canonicalize_nan64};
 use crate::{ty::maybe_unwrap, val::unwrap_val, WasmType, WasmValue};
 
 pub use func::FuncType;
@@ -165,10 +166,18 @@ impl WasmValue for Value {
         (U16, u16, make_u16, unwrap_u16),
         (U32, u32, make_u32, unwrap_u32),
         (U64, u64, make_u64, unwrap_u64),
-        (Float32, f32, make_float32, unwrap_float32),
-        (Float64, f64, make_float64, unwrap_float64),
         (Char, char, make_char, unwrap_char)
     );
+
+    fn make_float32(val: f32) -> Self {
+        let val = canonicalize_nan32(val);
+        Self(ValueEnum::Float32(val))
+    }
+
+    fn make_float64(val: f64) -> Self {
+        let val = canonicalize_nan64(val);
+        Self(ValueEnum::Float64(val))
+    }
 
     fn make_string(val: std::borrow::Cow<str>) -> Self {
         Self(ValueEnum::String(val.into()))
@@ -301,6 +310,16 @@ impl WasmValue for Value {
             .collect::<Result<Vec<_>, ValueError>>()?;
         let ty = maybe_unwrap!(&ty.0, TypeEnum::Flags).unwrap().clone();
         Ok(Self(ValueEnum::Flags(Flags { ty, flags })))
+    }
+
+    fn unwrap_float32(&self) -> f32 {
+        let val = *unwrap_val!(&self.0, ValueEnum::Float32, "float32");
+        canonicalize_nan32(val)
+    }
+
+    fn unwrap_float64(&self) -> f64 {
+        let val = *unwrap_val!(&self.0, ValueEnum::Float64, "float64");
+        canonicalize_nan64(val)
     }
 
     fn unwrap_string(&self) -> std::borrow::Cow<str> {

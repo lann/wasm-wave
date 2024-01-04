@@ -719,6 +719,7 @@ impl ParserError {
 #[cfg(test)]
 mod tests {
     use crate::value::{Type, Value};
+    use crate::{canonicalize_nan32, canonicalize_nan64};
 
     use super::*;
 
@@ -738,11 +739,11 @@ mod tests {
             ("2", Val::U64(2)),
             ("1.1", Val::Float32(1.1)),
             ("-1.1e+10", Val::Float32(-1.1e+10)),
-            ("nan", Val::Float32(f32::NAN)),
+            ("nan", Val::Float32(canonicalize_nan32(f32::NAN))),
             ("inf", Val::Float32(f32::INFINITY)),
             ("-inf", Val::Float32(f32::NEG_INFINITY)),
             ("1.1e-123", Val::Float64(1.1e-123)),
-            ("nan", Val::Float64(f64::NAN)),
+            ("nan", Val::Float64(canonicalize_nan64(f64::NAN))),
             ("inf", Val::Float64(f64::INFINITY)),
             ("-inf", Val::Float64(f64::NEG_INFINITY)),
             ("'x'", Val::Char('x')),
