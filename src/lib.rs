@@ -35,7 +35,14 @@ use writer::Writer;
 /// # }
 /// ```
 pub fn from_str<V: WasmValue>(ty: &V::Type, s: &str) -> Result<V, parser::ParserError> {
-    Parser::new(s).parse_value(ty)
+    let mut parser = Parser::new(s);
+
+    let value = parser.parse_value(ty)?;
+
+    // Ensure that we've parsed the entire string.
+    parser.finish()?;
+
+    Ok(value)
 }
 
 /// WAVE-encodes a [`WasmValue`] into a string.
