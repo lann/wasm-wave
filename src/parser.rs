@@ -778,6 +778,95 @@ mod tests {
     }
 
     #[test]
+    fn parse_record_reordering() {
+        let ty = Type::record([("red", Type::S32), ("green", Type::CHAR)]).unwrap();
+        // Parse the fields in the order they appear in the type.
+        assert_eq!(
+            parse_value("{red: 0, green: 'a'}", &ty),
+            Value::make_record(
+                &ty,
+                [
+                    ("red", Value::make_s32(0)),
+                    ("green", Value::make_char('a'))
+                ]
+            )
+            .unwrap()
+        );
+        // Parse the fields in reverse order.
+        assert_eq!(
+            parse_value("{green: 'a', red: 0}", &ty),
+            Value::make_record(
+                &ty,
+                [
+                    ("red", Value::make_s32(0)),
+                    ("green", Value::make_char('a'))
+                ]
+            )
+            .unwrap()
+        );
+    }
+
+    #[test]
+    fn parse_record_with_optional_fields() {
+        let field_ty = Type::option(Type::CHAR);
+        let ty = Type::record([("red", Type::S32), ("green", field_ty.clone())]).unwrap();
+        // Explicit `some`.
+        assert_eq!(
+            parse_value("{red: 0, green: some('a')}", &ty),
+            Value::make_record(
+                &ty,
+                [
+                    ("red", Value::make_s32(0)),
+                    (
+                        "green",
+                        Value::make_option(&field_ty, Some(Value::make_char('a'))).unwrap()
+                    )
+                ]
+            )
+            .unwrap()
+        );
+        // Flattened `some`.
+        assert_eq!(
+            parse_value("{red: 0, green: 'a'}", &ty),
+            Value::make_record(
+                &ty,
+                [
+                    ("red", Value::make_s32(0)),
+                    (
+                        "green",
+                        Value::make_option(&field_ty, Some(Value::make_char('a'))).unwrap()
+                    )
+                ]
+            )
+            .unwrap()
+        );
+        // Explicit `none`.
+        assert_eq!(
+            parse_value("{red: 0, green: none}", &ty),
+            Value::make_record(
+                &ty,
+                [
+                    ("red", Value::make_s32(0)),
+                    ("green", Value::make_option(&field_ty, None).unwrap())
+                ]
+            )
+            .unwrap()
+        );
+        // Implied `none`.
+        assert_eq!(
+            parse_value("{red: 0}", &ty),
+            Value::make_record(
+                &ty,
+                [
+                    ("red", Value::make_s32(0)),
+                    ("green", Value::make_option(&field_ty, None).unwrap())
+                ]
+            )
+            .unwrap()
+        );
+    }
+
+    #[test]
     fn parse_params_empty() {
         let vals: Vec<Value> = Parser::new("()").parse_params([]).unwrap();
         assert!(vals.is_empty());
