@@ -90,7 +90,7 @@ Lists are encoded as a square-braketed sequence of comma-separated values. Trail
 
 ### Records
 
-Records are encoded as curly-braced set of comma-separated record entries. Trailing commas are permitted. Each record entry consists of a field label, a colon, and a value. Record entries with the `option`-typed value `none` may be omitted.
+Records are encoded as curly-braced set of comma-separated record entries. Trailing commas are permitted. Each record entry consists of a field label, a colon, and a value. Record entries with the `option`-typed value `none` may be omitted. Fields may be present in any order.
 
 ```clike
 record example {
