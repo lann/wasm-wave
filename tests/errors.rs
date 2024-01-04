@@ -9,18 +9,18 @@ use wasmtime::{
 fn test_errors() {
     for (func, input) in [
         // Reject surrogates.
-        ("list-strings", "[\"[\\u{d800}\"]"),
-        ("list-strings", "[\"[\\u{dbff}\"]"),
-        ("list-strings", "[\"[\\u{dc00}\"]"),
-        ("list-strings", "[\"[\\u{dcff}\"]"),
-        ("list-strings", "[\"[\\u{d800}\\u{dc00}\"]"),
+        ("list-strings", "[\"\\u{d800}\"]"),
+        ("list-strings", "[\"\\u{dbff}\"]"),
+        ("list-strings", "[\"\\u{dc00}\"]"),
+        ("list-strings", "[\"\\u{dcff}\"]"),
+        ("list-strings", "[\"\\u{d800}\\u{dc00}\"]"),
         // Reject invalid values.
-        ("list-strings", "[\"[\\u{110000}\"]"),
-        ("list-strings", "[\"[\\u{ffffffff}\"]"),
-        ("list-strings", "[\"[\\u{80000000}\"]"),
+        ("list-strings", "[\"\\u{110000}\"]"),
+        ("list-strings", "[\"\\u{ffffffff}\"]"),
+        ("list-strings", "[\"\\u{80000000}\"]"),
         // Reject invalid syntax.
-        ("list-strings", "[\"[\\u{-1}\"]"),
-        ("list-strings", "[\"[\\u{+1}\"]"),
+        ("list-strings", "[\"\\u{-1}\"]"),
+        ("list-strings", "[\"\\u{+1}\"]"),
     ] {
         assert_reject(func, input);
     }
