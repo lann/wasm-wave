@@ -62,8 +62,9 @@ record-fields ::= ws record-field ws
                 | record-fields ',' record-field
 record-field ::= label ws ':' ws value
 
-label ::= word
-       | label '-' word
+label ::= '%'? inner-label
+inner-label ::= word
+              | inner-label '-' word
 word ::= [a-z][a-z0-9]*
        | [A-Z][A-Z0-9]*
 ```

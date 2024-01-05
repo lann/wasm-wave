@@ -453,7 +453,10 @@ impl<'a> Parser<'a> {
 
     fn peek_name(&mut self) -> Option<&str> {
         self.peek_next_non_whitespace()
-            .and_then(|(token, span)| (token == Token::Name).then(|| self.tokens.get_span(span)))
+            .and_then(|(token, span)| (token == Token::Name).then(|| {
+                let name = self.tokens.get_span(span);
+                name.strip_prefix('%').unwrap_or(name)
+            }))
     }
 
     fn expect_any_of(&mut self, expected: &[Token]) -> Result<(Token, Span), ParserError> {
@@ -566,7 +569,8 @@ impl<'a> Parser<'a> {
 
     fn parse_name(&mut self) -> Result<&str, ParserError> {
         let span = self.expect(Token::Name)?;
-        Ok(self.tokens.get_span(span))
+        let name = self.tokens.get_span(span);
+        Ok(name.strip_prefix('%').unwrap_or(name))
     }
 
     fn parse_maybe_payload<V: WasmValue>(
@@ -888,6 +892,23 @@ mod tests {
                 [
                     ("red", Value::make_s32(0)),
                     ("green", Value::make_option(&field_ty, None).unwrap())
+                ]
+            )
+            .unwrap()
+        );
+    }
+
+    #[test]
+    fn parse_percent_identifiers() {
+        let ty = Type::record([("red", Type::S32), ("green", Type::CHAR)]).unwrap();
+        // Test identifiers with '%' prefixes.
+        assert_eq!(
+            parse_value("{ %red: 0, %green: 'a' }", &ty),
+            Value::make_record(
+                &ty,
+                [
+                    ("red", Value::make_s32(0)),
+                    ("green", Value::make_char('a'))
                 ]
             )
             .unwrap()

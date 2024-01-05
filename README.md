@@ -40,7 +40,7 @@ Whitespace is _insignificant between tokens_ and _significant within tokens_: ke
 
 ### Labels
 
-Kebab-case labels are used for record fields, variant cases, enum cases, and flags. Labels use ASCII alphanumeric characters and hyphens, following the [Component Model `label` syntax](https://github.com/WebAssembly/component-model/blob/main/design/mvp/Explainer.md).
+Kebab-case labels are used for record fields, variant cases, enum cases, and flags. Labels use ASCII alphanumeric characters and hyphens, following the [Wit identifier syntax](https://github.com/WebAssembly/component-model/blob/main/design/mvp/WIT.md#identifiers).
 
 ### Bools
 
