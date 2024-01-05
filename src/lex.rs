@@ -99,6 +99,12 @@ impl<'a> Tokenizer<'a> {
                 self.eat_while(|ch| ch.is_ascii_alphanumeric() || ch == '-');
                 Token::Name
             }
+            '%' => {
+                // A `%`-prefixed identifier.
+                self.pos += 1;
+                self.eat_while(|ch| ch.is_ascii_alphanumeric() || ch == '-');
+                Token::Name
+            }
             '0'..='9' => {
                 // Eat characters from numbers (including decimals and exponents)
                 self.eat_while(|ch| matches!(ch, '0'..='9' | '-' | '.' | 'e' | 'E' | '+'));
