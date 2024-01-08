@@ -6,6 +6,43 @@ use wasmtime::{
 };
 
 #[test]
+fn test_float_errors() {
+    for (func, input) in [
+        // Reject "-nan".
+        ("floats", "(-nan, 0.0)"),
+        ("floats", "(0.0, -nan)"),
+        // Reject "infinity", "-infinity", and uppercase variations.
+        ("floats", "(0.0, infinity)"),
+        ("floats", "(0.0, -infinity)"),
+        ("floats", "(infinity, 0.0)"),
+        ("floats", "(-infinity, 0.0)"),
+        ("floats", "(0.0, INFINITY)"),
+        ("floats", "(0.0, -INFINITY)"),
+        ("floats", "(INFINITY, 0.0)"),
+        ("floats", "(-INFINITY, 0.0)"),
+        ("floats", "(0.0, Infinity)"),
+        ("floats", "(0.0, -Infinity)"),
+        ("floats", "(Infinity, 0.0)"),
+        ("floats", "(-Infinity, 0.0)"),
+        // Reject uppercase variations of "inf" and "nan".
+        ("floats", "(0.0, Inf)"),
+        ("floats", "(0.0, -Inf)"),
+        ("floats", "(Inf, 0.0)"),
+        ("floats", "(-Inf, 0.0)"),
+        ("floats", "(0.0, INF)"),
+        ("floats", "(0.0, -INF)"),
+        ("floats", "(INF, 0.0)"),
+        ("floats", "(-INF, 0.0)"),
+        ("floats", "(0.0, NaN)"),
+        ("floats", "(NaN, 0.0)"),
+        ("floats", "(0.0, NAN)"),
+        ("floats", "(NAN, 0.0)"),
+    ] {
+        assert_reject(func, input);
+    }
+}
+
+#[test]
 fn test_errors() {
     for (func, input) in [
         // Reject surrogates.

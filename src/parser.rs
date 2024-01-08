@@ -174,7 +174,7 @@ impl<'a> Parser<'a> {
         T: FromStr,
         ParserError: From<T::Err>,
     {
-        let (token, mut span) = self.expect_any_of(if signed {
+        let (mut token, mut span) = self.expect_any_of(if signed {
             &[Token::Number, Token::Dash, Token::Name]
         } else {
             &[Token::Number, Token::Name]
@@ -182,9 +182,10 @@ impl<'a> Parser<'a> {
         if token == Token::Dash {
             // Whitespace isn't allowed here, so get the next token directly
             match self.tokens.next_token()? {
-                Some(Token::Number | Token::Name) => {
+                Some(next_token @ Token::Number | next_token @ Token::Name) => {
                     // Include leading dash in span
                     span.end = self.tokens.pos();
+                    token = next_token;
                 }
                 other => {
                     return Err(ParserError::UnexpectedToken {
@@ -194,7 +195,18 @@ impl<'a> Parser<'a> {
                 }
             }
         }
-        Ok(self.tokens.get_span(span).parse()?)
+
+        let s = self.tokens.get_span(span);
+
+        // Limit names to specific recognized names.
+        if token == Token::Name && s != "inf" && s != "-inf" && s != "nan" {
+            return Err(ParserError::UnexpectedName {
+                expected: vec!["inf".to_string(), "-inf".to_string(), "nan".to_string()],
+                got: s.to_string(),
+            });
+        }
+
+        Ok(s.parse()?)
     }
 
     fn parse_char(&mut self) -> Result<char, ParserError> {
