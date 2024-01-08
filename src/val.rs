@@ -72,12 +72,22 @@ pub trait WasmValue: Clone + Sized {
         unimplemented!()
     }
     /// Returns a new WasmValue of the given type.
+    ///
+    /// The Rust `f32` type has many distinct NaN bitpatterns, however the
+    /// component-model `float32` type only has a single NaN value, so this
+    /// function does not preserve NaN bitpatterns.
+    ///
     /// # Panics
     /// Panics if the type is not implemented (the trait default).
     fn make_float32(val: f32) -> Self {
         unimplemented!()
     }
     /// Returns a new WasmValue of the given type.
+    ///
+    /// The Rust `f64` type has many distinct NaN bitpatterns, however the
+    /// component-model `float64` type only has a single NaN value, so this
+    /// function does not preserve NaN bitpatterns.
+    ///
     /// # Panics
     /// Panics if the type is not implemented (the trait default).
     fn make_float64(val: f64) -> Self {
@@ -214,12 +224,22 @@ pub trait WasmValue: Clone + Sized {
         unimplemented!()
     }
     /// Returns the underlying value of the WasmValue, panicing if it's the wrong type.
+    ///
+    /// The Rust `f32` type has many distinct NaN bitpatterns, however the
+    /// component-model `float64` type only has a single NaN value, so this
+    /// function does not preserve NaN bitpatterns.
+    ///
     /// # Panics
     /// Panics if `self` is not of the right type.
     fn unwrap_float32(&self) -> f32 {
         unimplemented!()
     }
     /// Returns the underlying value of the WasmValue, panicing if it's the wrong type.
+    ///
+    /// The Rust `f64` type has many distinct NaN bitpatterns, however the
+    /// component-model `float64` type only has a single NaN value, so this
+    /// function does not preserve NaN bitpatterns.
+    ///
     /// # Panics
     /// Panics if `self` is not of the right type.
     fn unwrap_float64(&self) -> f64 {

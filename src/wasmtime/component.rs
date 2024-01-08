@@ -3,6 +3,7 @@ use std::borrow::Cow;
 use wasmtime::component;
 
 use crate::{
+    canonicalize_nan32, canonicalize_nan64,
     fmt::DisplayFunc,
     func::WasmFunc,
     ty::{maybe_unwrap, WasmTypeKind},
@@ -121,11 +122,17 @@ impl WasmValue for component::Val {
         (U16, u16, make_u16, unwrap_u16),
         (U32, u32, make_u32, unwrap_u32),
         (U64, u64, make_u64, unwrap_u64),
-        (Float32, f32, make_float32, unwrap_float32),
-        (Float64, f64, make_float64, unwrap_float64),
         (Char, char, make_char, unwrap_char)
     );
 
+    fn make_float32(val: f32) -> Self {
+        let val = canonicalize_nan32(val);
+        Self::Float32(val)
+    }
+    fn make_float64(val: f64) -> Self {
+        let val = canonicalize_nan64(val);
+        Self::Float64(val)
+    }
     fn make_string(val: Cow<str>) -> Self {
         Self::String(val.into())
     }
@@ -170,6 +177,14 @@ impl WasmValue for component::Val {
             .new_val(&names.into_iter().collect::<Vec<_>>())
     }
 
+    fn unwrap_float32(&self) -> f32 {
+        let val = *unwrap_val!(self, Self::Float32, "float32");
+        canonicalize_nan32(val)
+    }
+    fn unwrap_float64(&self) -> f64 {
+        let val = *unwrap_val!(self, Self::Float64, "float64");
+        canonicalize_nan64(val)
+    }
     fn unwrap_string(&self) -> Cow<str> {
         unwrap_val!(self, Self::String, "string").as_ref().into()
     }
