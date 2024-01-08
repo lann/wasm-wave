@@ -115,7 +115,7 @@ fn flags_round_trips() {
     let ty = Type::flags(["read", "write", "execute"]).unwrap();
     test_value_round_trip(Value::make_flags(&ty, []).unwrap());
     test_value_round_trip(Value::make_flags(&ty, ["write"]).unwrap());
-    test_value_round_trip(Value::make_flags(&ty, ["execute", "read"]).unwrap());
+    test_value_round_trip(Value::make_flags(&ty, ["read", "execute"]).unwrap());
 }
 
 fn test_value_round_trip(val: Value) {

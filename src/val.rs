@@ -115,6 +115,10 @@ pub trait WasmValue: Clone + Sized {
         unimplemented!()
     }
     /// Returns a new WasmValue of the given type.
+    ///
+    /// The fields provided by `fields` are not necessarily sorted; the callee
+    /// should perform sorting itself if needed.
+    ///
     /// # Panics
     /// Panics if the type is not implemented (the trait default).
     fn make_record<'a>(
@@ -160,6 +164,10 @@ pub trait WasmValue: Clone + Sized {
         unimplemented!()
     }
     /// Returns a new WasmValue of the given type.
+    ///
+    /// The strings provided by `names` are not necessarily sorted; the callee
+    /// should perform sorting itself if needed.
+    ///
     /// # Panics
     /// Panics if the type is not implemented (the trait default).
     fn make_flags<'a>(
