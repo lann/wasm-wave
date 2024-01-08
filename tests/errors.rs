@@ -43,7 +43,7 @@ fn test_float_errors() {
 }
 
 #[test]
-fn test_errors() {
+fn test_string_errors() {
     for (func, input) in [
         // Reject surrogates.
         ("list-strings", "[\"\\u{d800}\"]"),
@@ -105,6 +105,65 @@ fn test_result_errors() {
         ("result-both-payloads", "err"),
         ("result-both-payloads", "err()"),
         ("result-both-payloads", "e(0)"),
+    ] {
+        assert_reject(func, input);
+    }
+}
+
+#[test]
+fn test_record_errors() {
+    // Missing `required`.
+    assert_reject("record", "{}");
+    assert_reject("record", "{ optional: none }");
+    assert_reject("record", "{ optional: some(0) }");
+
+    // Duplicate `required`.
+    assert_reject("record", "{ required: 0, required: 0 }");
+    assert_reject("record", "{ required: 0, required: 0, optional: none }");
+    assert_reject("record", "{ required: 0, required: 0, optional: some(0) }");
+
+    // Duplicate `optional`.
+    assert_reject("record", "{ required: 0, optional: none, optional: none }");
+    assert_reject(
+        "record",
+        "{ required: 0, optional: none, optional: some(0) }",
+    );
+    assert_reject(
+        "record",
+        "{ required: 0, optional: some(0), optional: none }",
+    );
+    assert_reject(
+        "record",
+        "{ required: 0, optional: some(0), optional: some(0) }",
+    );
+
+    // Bad commas.
+    assert_reject("record", "{ required: 0,, }");
+    assert_reject("record", "{ , required: 0, }");
+    assert_reject("record", "{ ,, required: 0 }");
+}
+
+#[test]
+fn test_flags_errors() {
+    // Duplicate flags.
+    assert_reject("flags", "{ read, read }");
+    assert_reject("flags", "{ write, write }");
+    assert_reject("flags", "{ read, write, read }");
+
+    // Unrecognized flag.
+    assert_reject("flags", "{ read, write, execute }");
+}
+
+#[test]
+fn test_list_errors() {
+    for (func, input) in [
+        ("list-strings", "[\"\\u{0}\",,]"),
+        ("list-strings", "[,\"\\u{0}\"]"),
+        ("list-strings", "[,]"),
+        ("list-strings", "[)"),
+        ("list-strings", "(]"),
+        ("list-strings", "[}"),
+        ("list-strings", "{]"),
     ] {
         assert_reject(func, input);
     }
