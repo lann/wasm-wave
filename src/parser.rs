@@ -403,29 +403,24 @@ impl<'a> Parser<'a> {
 
     fn parse_flags<V: WasmValue>(&mut self, ty: &V::Type) -> Result<V, ParserError> {
         self.expect(Token::LCurly)?;
-        let names: IndexSet<_> = ty.flags_names().collect();
-        let mut flags = IndexSet::<_>::new();
+        let mut names: IndexSet<_> = ty.flags_names().collect();
+        let mut flags = Vec::new();
         loop {
-            if self.maybe_close_delim(Token::RCurly, flags.len() == names.len())? {
+            if self.maybe_close_delim(Token::RCurly, names.is_empty())? {
                 break;
             }
 
-            let remaining = names
-                .iter()
-                .cloned()
-                .filter(|name| !flags.contains(name.as_ref()));
-            let name = self.expect_name(remaining.clone())?;
+            let remaining = names.iter().cloned();
+            let name = self.expect_name(remaining)?;
 
-            let flag = names.get(name).unwrap();
-            if !flags.insert(flag.as_ref()) {
-                return Err(ParserError::FieldDuplicated(name.into()));
-            }
+            let flag = names.take(name).unwrap();
+            flags.push(flag);
 
             if let (Token::RCurly, _) = self.expect_any_of(&[Token::RCurly, Token::Comma])? {
                 break;
             }
         }
-        V::make_flags(ty, flags).map_err(ParserError::make_value)
+        V::make_flags(ty, flags.iter().map(Cow::as_ref)).map_err(ParserError::make_value)
     }
 
     fn next_non_whitespace(&mut self) -> Result<Option<(Token, Span)>, ParserError> {
@@ -663,9 +658,6 @@ pub enum ParserError {
     /// Invalid params encoding
     #[error("error parsing params: {0}")]
     ParseParams(String),
-    /// Duplicate record field
-    #[error("duplicate field `{0}`")]
-    FieldDuplicated(String),
     /// Missing record field
     #[error("missing field `{0}`")]
     FieldMissing(String),
@@ -895,6 +887,21 @@ mod tests {
                 ]
             )
             .unwrap()
+        );
+    }
+
+    #[test]
+    fn parse_flag_reordering() {
+        let ty = Type::flags(["hot", "cold"]).unwrap();
+        // Parse the flags in the order they appear in the type.
+        assert_eq!(
+            parse_value("{hot, cold}", &ty),
+            Value::make_flags(&ty, ["hot", "cold"]).unwrap()
+        );
+        // Parse the flags in reverse order.
+        assert_eq!(
+            parse_value("{cold, hot}", &ty),
+            Value::make_flags(&ty, ["hot", "cold"]).unwrap()
         );
     }
 

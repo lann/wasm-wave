@@ -290,7 +290,7 @@ impl WasmValue for Value {
         names: impl IntoIterator<Item = &'a str>,
     ) -> Result<Self, Self::Error> {
         let flag_names = ty.flags_names().collect::<Vec<_>>();
-        let flags = names
+        let mut flags = names
             .into_iter()
             .map(|name| {
                 flag_names
@@ -299,6 +299,9 @@ impl WasmValue for Value {
                     .ok_or_else(|| ValueError::InvalidValue(format!("unknown flag `{name}`")))
             })
             .collect::<Result<Vec<_>, ValueError>>()?;
+        // Flags values don't logically contain an ordering of the flags. Sort
+        // the flags values so that equivalent flags values compare equal.
+        flags.sort();
         let ty = maybe_unwrap!(&ty.0, TypeEnum::Flags).unwrap().clone();
         Ok(Self(ValueEnum::Flags(Flags { ty, flags })))
     }
