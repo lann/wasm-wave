@@ -48,12 +48,14 @@ variant-case-payload ::= '(' value-ws ')'
 
 tuple ::= '(' values-seq ','? ')'
 
-list ::= '[' values-seq ','? ']'
+list ::= '[' ws ']'
+       | '[' values-seq ','? ']'
 
 values-seq ::= value-ws
              | values ',' values-ws
 
-flags ::= '{' flags-seq ','? '}'
+flags ::= '{' ws '}'
+        | '{' flags-seq ','? '}'
 flags-seq ::= ws label ws
             | flags-seq ',' label
 
