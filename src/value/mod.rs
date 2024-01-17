@@ -253,7 +253,7 @@ impl WasmValue for Value {
             .variant_cases()
             .enumerate()
             .find_map(|(idx, (name, ty))| (name == case).then_some((idx, ty)))
-            .ok_or_else(|| ValueError::InvalidValue(format!("unknown case `{case}` for {ty:?}")))?;
+            .ok_or_else(|| ValueError::InvalidValue(format!("unknown case {case:?} for {ty:?}")))?;
         let payload = check_option_type(&payload_type, val)?;
         let ty = maybe_unwrap!(&ty.0, TypeEnum::Variant).unwrap().clone();
         Ok(Self(ValueEnum::Variant(Variant { ty, case, payload })))
@@ -263,7 +263,7 @@ impl WasmValue for Value {
         let case = ty
             .enum_cases()
             .position(|name| name == case)
-            .ok_or_else(|| ValueError::InvalidValue(format!("unknown case `{case}` for {ty:?}")))?;
+            .ok_or_else(|| ValueError::InvalidValue(format!("unknown case {case:?} for {ty:?}")))?;
         let ty = maybe_unwrap!(&ty.0, TypeEnum::Enum).unwrap().clone();
         Ok(Self(ValueEnum::Enum(Enum { ty, case })))
     }
@@ -305,7 +305,7 @@ impl WasmValue for Value {
                 flag_names
                     .iter()
                     .position(|flag| flag == name)
-                    .ok_or_else(|| ValueError::InvalidValue(format!("unknown flag `{name}`")))
+                    .ok_or_else(|| ValueError::InvalidValue(format!("unknown flag {name:?}")))
             })
             .collect::<Result<Vec<_>, ValueError>>()?;
         // Flags values don't logically contain an ordering of the flags. Sort
@@ -424,10 +424,10 @@ pub enum ValueError {
     InvalidValue(String),
 
     /// Missing record field.
-    #[error("missing field `{0}`")]
+    #[error("missing field {0:?}")]
     MissingField(Box<str>),
 
     /// Unknown record field.
-    #[error("unknown field `{0}`")]
+    #[error("unknown field {0:?}")]
     UnknownField(Box<str>),
 }

@@ -671,7 +671,7 @@ pub enum ParserError {
     #[error("error parsing params: {0}")]
     ParseParams(String),
     /// Missing record field
-    #[error("missing field `{0}`")]
+    #[error("missing field {0:?}")]
     FieldMissing(String),
     /// RecordUnexpected name token
     #[error("expected {expected:?}, got {got:?}")]
