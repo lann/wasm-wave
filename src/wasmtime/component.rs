@@ -7,7 +7,7 @@ use crate::{
     fmt::DisplayFunc,
     func::WasmFunc,
     ty::{maybe_unwrap, WasmTypeKind},
-    val::unwrap_val,
+    val::{unwrap_val, WasmValueError, ensure_type_kind},
     WasmType, WasmValue,
 };
 
@@ -105,7 +105,6 @@ macro_rules! impl_primitives {
 
 impl WasmValue for component::Val {
     type Type = component::Type;
-    type Error = wasmtime::Error;
 
     fn ty(&self) -> Self::Type {
         self.ty()
@@ -139,42 +138,62 @@ impl WasmValue for component::Val {
     fn make_list(
         ty: &Self::Type,
         vals: impl IntoIterator<Item = Self>,
-    ) -> Result<Self, Self::Error> {
-        ty.unwrap_list().new_val(vals.into_iter().collect())
+    ) -> Result<Self, WasmValueError> {
+        ensure_type_kind(ty, WasmTypeKind::List)?;
+        ty.unwrap_list()
+            .new_val(vals.into_iter().collect())
+            .map_err(WasmValueError::other)
     }
     fn make_record<'a>(
         ty: &Self::Type,
         fields: impl IntoIterator<Item = (&'a str, Self)>,
-    ) -> Result<Self, Self::Error> {
-        ty.unwrap_record().new_val(fields)
+    ) -> Result<Self, WasmValueError> {
+        ty.unwrap_record()
+            .new_val(fields)
+            .map_err(WasmValueError::other)
     }
     fn make_tuple(
         ty: &Self::Type,
         vals: impl IntoIterator<Item = Self>,
-    ) -> Result<Self, Self::Error> {
-        ty.unwrap_tuple().new_val(vals.into_iter().collect())
+    ) -> Result<Self, WasmValueError> {
+        ty.unwrap_tuple()
+            .new_val(vals.into_iter().collect())
+            .map_err(WasmValueError::other)
     }
-    fn make_variant(ty: &Self::Type, case: &str, val: Option<Self>) -> Result<Self, Self::Error> {
-        ty.unwrap_variant().new_val(case, val)
+    fn make_variant(
+        ty: &Self::Type,
+        case: &str,
+        val: Option<Self>,
+    ) -> Result<Self, WasmValueError> {
+        ty.unwrap_variant()
+            .new_val(case, val)
+            .map_err(WasmValueError::other)
     }
-    fn make_enum(ty: &Self::Type, case: &str) -> Result<Self, Self::Error> {
-        ty.unwrap_enum().new_val(case)
+    fn make_enum(ty: &Self::Type, case: &str) -> Result<Self, WasmValueError> {
+        ty.unwrap_enum()
+            .new_val(case)
+            .map_err(WasmValueError::other)
     }
-    fn make_option(ty: &Self::Type, val: Option<Self>) -> Result<Self, Self::Error> {
-        ty.unwrap_option().new_val(val)
+    fn make_option(ty: &Self::Type, val: Option<Self>) -> Result<Self, WasmValueError> {
+        ty.unwrap_option()
+            .new_val(val)
+            .map_err(WasmValueError::other)
     }
     fn make_result(
         ty: &Self::Type,
         val: Result<Option<Self>, Option<Self>>,
-    ) -> Result<Self, Self::Error> {
-        ty.unwrap_result().new_val(val)
+    ) -> Result<Self, WasmValueError> {
+        ty.unwrap_result()
+            .new_val(val)
+            .map_err(WasmValueError::other)
     }
     fn make_flags<'a>(
         ty: &Self::Type,
         names: impl IntoIterator<Item = &'a str>,
-    ) -> Result<Self, Self::Error> {
+    ) -> Result<Self, WasmValueError> {
         ty.unwrap_flags()
             .new_val(&names.into_iter().collect::<Vec<_>>())
+            .map_err(WasmValueError::other)
     }
 
     fn unwrap_float32(&self) -> f32 {

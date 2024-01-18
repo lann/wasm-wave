@@ -2,15 +2,12 @@ use wit_parser::{
     Enum, Flags, Function, Record, Resolve, Result_, Tuple, Type, TypeDefKind, TypeId, Variant,
 };
 
-use crate::value;
+use crate::{val::WasmValueError, value};
 
 /// Resolves a [`value::Type`] from the given [`wit_parser::Resolve`] and [`TypeId`].
 /// # Panics
 /// Panics if `type_id` is not valid in `resolve`.
-pub fn resolve_wit_type(
-    resolve: &Resolve,
-    type_id: TypeId,
-) -> Result<value::Type, value::ValueError> {
+pub fn resolve_wit_type(resolve: &Resolve, type_id: TypeId) -> Result<value::Type, WasmValueError> {
     TypeResolver { resolve }.resolve_type_id(type_id)
 }
 
@@ -20,7 +17,7 @@ pub fn resolve_wit_type(
 pub fn resolve_wit_func_type(
     resolve: &Resolve,
     function: &Function,
-) -> Result<value::FuncType, value::ValueError> {
+) -> Result<value::FuncType, WasmValueError> {
     let resolver = TypeResolver { resolve };
     let params = resolver.resolve_params(&function.params)?;
     let results = match &function.results {
@@ -34,7 +31,7 @@ struct TypeResolver<'a> {
     resolve: &'a Resolve,
 }
 
-type ValueResult = Result<value::Type, value::ValueError>;
+type ValueResult = Result<value::Type, WasmValueError>;
 
 impl<'a> TypeResolver<'a> {
     fn resolve_type_id(&self, type_id: TypeId) -> ValueResult {
@@ -48,7 +45,7 @@ impl<'a> TypeResolver<'a> {
     fn resolve_params(
         &self,
         params: &[(String, Type)],
-    ) -> Result<Vec<(String, value::Type)>, value::ValueError> {
+    ) -> Result<Vec<(String, value::Type)>, WasmValueError> {
         params
             .iter()
             .map(|(name, ty)| {
@@ -87,10 +84,7 @@ impl<'a> TypeResolver<'a> {
             TypeDefKind::Type(Type::Char) => Ok(value::Type::CHAR),
             TypeDefKind::Type(Type::String) => Ok(value::Type::STRING),
             TypeDefKind::Type(Type::Id(_)) => unreachable!(),
-            other => Err(value::ValueError::InvalidType(format!(
-                "unsupported type {}",
-                other.as_str()
-            ))),
+            other => Err(WasmValueError::UnsupportedType(other.as_str().into())),
         }
     }
 
@@ -164,9 +158,9 @@ mod tests {
         let unresolved = UnresolvedPackage::parse(
             "test.wit".as_ref(),
             r#"
-            package test:types
+            package test:types;
             interface types {
-                type uint8 = u8
+                type uint8 = u8;
             }
         "#,
         )
@@ -184,12 +178,12 @@ mod tests {
         let unresolved = UnresolvedPackage::parse(
             "test.wit".as_ref(),
             r#"
-            package test:types
+            package test:types;
             interface types {
-                type uint8 = u8
-                no-results: func(a: uint8, b: string)
-                one-result: func(c: uint8, d: string) -> uint8
-                named-results: func(e: uint8, f: string) -> (x: u8, y: string)
+                type uint8 = u8;
+                no-results: func(a: uint8, b: string);
+                one-result: func(c: uint8, d: string) -> uint8;
+                named-results: func(e: uint8, f: string) -> (x: u8, y: string);
             }
         "#,
         )

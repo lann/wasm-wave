@@ -3,26 +3,27 @@
 //! <https://github.com/lann/wave>
 #![deny(missing_docs)]
 
+pub mod ast;
 pub mod fmt;
 pub mod func;
+pub mod lex;
 pub mod parser;
 pub mod value;
 pub mod writer;
 
-mod lex;
 mod ty;
+mod untyped;
 mod val;
 
-/// Completion API
-pub mod completion;
 #[cfg(feature = "wasmtime")]
 /// Implementations for [`wasmtime`] types.
 pub mod wasmtime;
 
 pub use ty::{WasmType, WasmTypeKind};
+pub use untyped::UntypedValue;
 pub use val::WasmValue;
 
-use parser::Parser;
+pub use parser::Parser;
 use writer::Writer;
 
 /// Parses a [`WasmValue`] from the given WAVE-encoded string.

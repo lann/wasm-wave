@@ -1,7 +1,10 @@
 use std::borrow::Cow;
 
 use crate::{
-    canonicalize_nan32, canonicalize_nan64, func::WasmFunc, ty::WasmTypeKind, val::unwrap_val,
+    canonicalize_nan32, canonicalize_nan64,
+    func::WasmFunc,
+    ty::WasmTypeKind,
+    val::{unwrap_val, WasmValueError},
     WasmType, WasmValue,
 };
 
@@ -28,7 +31,6 @@ impl WasmType for wasmtime::ValType {
 
 impl WasmValue for wasmtime::Val {
     type Type = wasmtime::ValType;
-    type Error = &'static str;
 
     fn ty(&self) -> Self::Type {
         self.ty()
@@ -51,18 +53,18 @@ impl WasmValue for wasmtime::Val {
     fn make_tuple(
         ty: &Self::Type,
         vals: impl IntoIterator<Item = Self>,
-    ) -> Result<Self, Self::Error> {
+    ) -> Result<Self, WasmValueError> {
         if *ty != Self::Type::V128 {
-            return Err("tuples only used for v128 (v64x2)");
+            return Err(WasmValueError::other("tuples only used for v128 (v64x2)"));
         }
         let [l_val, h_val]: [Self; 2] = vals
             .into_iter()
             .collect::<Vec<_>>()
             .try_into()
-            .map_err(|_| "expected 2 values")?;
+            .map_err(|_| WasmValueError::other("expected 2 values"))?;
 
         let (Some(l), Some(h)) = (l_val.i64(), h_val.i64()) else {
-            return Err("expected 2 i64s (v64x2)");
+            return Err(WasmValueError::other("expected 2 i64s (v64x2)"));
         };
         Ok(Self::V128((h as u128) << 64 | (l as u128)))
     }

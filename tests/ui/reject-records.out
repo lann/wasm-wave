@@ -1,0 +1,18 @@
+// Missing `required`.
+error converting Wasm value: missing record field "required" at 13..31
+error converting Wasm value: missing record field "required" at 13..34
+// Duplicate `required`.
+invalid value: duplicate field "required" at 28..36
+invalid value: duplicate field "required" at 28..36
+invalid value: duplicate field "required" at 28..36
+// Duplicate `optional`.
+invalid value: duplicate field "optional" at 44..52
+invalid value: duplicate field "optional" at 44..52
+invalid value: duplicate field "optional" at 47..55
+invalid value: duplicate field "optional" at 47..55
+// Bad commas.
+unexpected token: Comma at 27..28
+unexpected token: Comma at 15..16
+unexpected token: Comma at 15..16
+// Invalid empty record syntax.
+invalid value type at 23..25
