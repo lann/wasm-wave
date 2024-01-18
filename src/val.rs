@@ -1,4 +1,10 @@
-use std::{borrow::Cow, fmt::Display};
+use std::borrow::Cow;
+
+use crate::{
+    fmt::{DisplayType, DisplayValue},
+    ty::WasmType,
+    WasmTypeKind,
+};
 
 /// The WasmValue trait may be implemented to represent values to be
 /// (de)serialized with WAVE, notably [`value::Value`](crate::value::Value)
@@ -9,10 +15,7 @@ use std::{borrow::Cow, fmt::Display};
 #[allow(unused_variables)]
 pub trait WasmValue: Clone + Sized {
     /// A type representing types of these values.
-    type Type: crate::ty::WasmType;
-
-    /// An associated error which can be returned from creating values.
-    type Error: Display;
+    type Type: WasmType;
 
     /// The type of this value.
     fn ty(&self) -> Self::Type;
@@ -111,7 +114,7 @@ pub trait WasmValue: Clone + Sized {
     fn make_list(
         ty: &Self::Type,
         vals: impl IntoIterator<Item = Self>,
-    ) -> Result<Self, Self::Error> {
+    ) -> Result<Self, WasmValueError> {
         unimplemented!()
     }
     /// Returns a new WasmValue of the given type.
@@ -124,7 +127,7 @@ pub trait WasmValue: Clone + Sized {
     fn make_record<'a>(
         ty: &Self::Type,
         fields: impl IntoIterator<Item = (&'a str, Self)>,
-    ) -> Result<Self, Self::Error> {
+    ) -> Result<Self, WasmValueError> {
         unimplemented!()
     }
     /// Returns a new WasmValue of the given type.
@@ -133,25 +136,29 @@ pub trait WasmValue: Clone + Sized {
     fn make_tuple(
         ty: &Self::Type,
         vals: impl IntoIterator<Item = Self>,
-    ) -> Result<Self, Self::Error> {
+    ) -> Result<Self, WasmValueError> {
         unimplemented!()
     }
     /// Returns a new WasmValue of the given type.
     /// # Panics
     /// Panics if the type is not implemented (the trait default).
-    fn make_variant(ty: &Self::Type, case: &str, val: Option<Self>) -> Result<Self, Self::Error> {
+    fn make_variant(
+        ty: &Self::Type,
+        case: &str,
+        val: Option<Self>,
+    ) -> Result<Self, WasmValueError> {
         unimplemented!()
     }
     /// Returns a new WasmValue of the given type.
     /// # Panics
     /// Panics if the type is not implemented (the trait default).
-    fn make_enum(ty: &Self::Type, case: &str) -> Result<Self, Self::Error> {
+    fn make_enum(ty: &Self::Type, case: &str) -> Result<Self, WasmValueError> {
         unimplemented!()
     }
     /// Returns a new WasmValue of the given type.
     /// # Panics
     /// Panics if the type is not implemented (the trait default).
-    fn make_option(ty: &Self::Type, val: Option<Self>) -> Result<Self, Self::Error> {
+    fn make_option(ty: &Self::Type, val: Option<Self>) -> Result<Self, WasmValueError> {
         unimplemented!()
     }
     /// Returns a new WasmValue of the given type.
@@ -160,7 +167,7 @@ pub trait WasmValue: Clone + Sized {
     fn make_result(
         ty: &Self::Type,
         val: Result<Option<Self>, Option<Self>>,
-    ) -> Result<Self, Self::Error> {
+    ) -> Result<Self, WasmValueError> {
         unimplemented!()
     }
     /// Returns a new WasmValue of the given type.
@@ -173,7 +180,7 @@ pub trait WasmValue: Clone + Sized {
     fn make_flags<'a>(
         ty: &Self::Type,
         names: impl IntoIterator<Item = &'a str>,
-    ) -> Result<Self, Self::Error> {
+    ) -> Result<Self, WasmValueError> {
         unimplemented!()
     }
 
@@ -315,6 +322,71 @@ pub trait WasmValue: Clone + Sized {
     }
 }
 
+/// Returns an error if the given [`WasmType`] is not of the given [`WasmTypeKind`].
+pub fn ensure_type_kind(ty: &impl WasmType, kind: WasmTypeKind) -> Result<(), WasmValueError> {
+    if ty.kind() == kind {
+        Ok(())
+    } else {
+        Err(WasmValueError::WrongTypeKind {
+            ty: DisplayType(ty).to_string(),
+            kind,
+        })
+    }
+}
+
+/// An error from creating a [`WasmValue`].
+#[derive(Debug)]
+pub enum WasmValueError {
+    MissingField(String),
+    MissingPayload(String),
+    UnexpectedPayload(String),
+    UnknownCase(String),
+    UnknownField(String),
+    UnsupportedType(String),
+    WrongNumberOfTupleValues { want: usize, got: usize },
+    WrongTypeKind { kind: WasmTypeKind, ty: String },
+    WrongValueType { ty: String, val: String },
+    Other(String),
+}
+
+impl WasmValueError {
+    pub(crate) fn wrong_value_type(ty: &impl WasmType, val: &impl WasmValue) -> Self {
+        Self::WrongValueType {
+            ty: DisplayType(ty).to_string(),
+            val: DisplayValue(val).to_string(),
+        }
+    }
+
+    pub(crate) fn other(msg: impl std::fmt::Display) -> Self {
+        Self::Other(msg.to_string())
+    }
+}
+
+impl std::fmt::Display for WasmValueError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::MissingField(name) => {
+                write!(f, "missing field {name:?}")
+            }
+            Self::MissingPayload(name) => write!(f, "missing payload for {name:?} case"),
+            Self::UnexpectedPayload(name) => write!(f, "unexpected payload for {name:?} case"),
+            Self::UnknownCase(name) => write!(f, "unknown case {name:?}"),
+            Self::UnknownField(name) => write!(f, "unknown field {name:?}"),
+            Self::UnsupportedType(ty) => write!(f, "unsupported type {ty}"),
+            Self::WrongNumberOfTupleValues { want, got } => {
+                write!(f, "expected {want} tuple elements; got {got}")
+            }
+            Self::WrongTypeKind { kind, ty } => {
+                write!(f, "expected a {kind}; got {ty}")
+            }
+            Self::WrongValueType { ty, val } => {
+                write!(f, "expected a {ty}; got {val}")
+            }
+            Self::Other(msg) => write!(f, "{msg}"),
+        }
+    }
+}
+
 macro_rules! unwrap_val {
     ($val:expr, $case:path, $name:expr) => {
         match $val {
@@ -323,5 +395,4 @@ macro_rules! unwrap_val {
         }
     };
 }
-
 pub(crate) use unwrap_val;

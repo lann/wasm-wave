@@ -1,0 +1,13 @@
+// Reject surrogates.
+invalid character escape at 7..17
+invalid character escape at 7..17
+invalid character escape at 7..17
+invalid character escape at 7..17
+invalid character escape at 7..26
+// Reject invalid values.
+invalid character escape at 7..19
+invalid token at 7..16
+invalid token at 7..16
+// Reject invalid syntax.
+invalid token at 7..8
+invalid token at 7..8

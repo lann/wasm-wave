@@ -5,20 +5,22 @@ use std::fmt::Display;
 use crate::{func::WasmFunc, ty::WasmTypeKind, writer::Writer, WasmType, WasmValue};
 
 /// Implements a WAVE-formatted [`Display`] for a [`WasmType`].
-pub struct DisplayType<T: WasmType>(pub T);
+pub struct DisplayType<'a, T: WasmType>(pub &'a T);
 
-impl<T: WasmType> Display for DisplayType<T> {
+impl<'a, T: WasmType> Display for DisplayType<'a, T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let ty = &self.0;
+        let ty = self.0;
         match ty.kind() {
-            WasmTypeKind::List => write!(f, "list<{}>", Self(ty.list_element_type().unwrap())),
+            WasmTypeKind::List => {
+                write!(f, "list<{}>", DisplayType(&ty.list_element_type().unwrap()))
+            }
             WasmTypeKind::Record => {
                 f.write_str("record { ")?;
                 for (idx, (name, field_type)) in ty.record_fields().enumerate() {
                     if idx != 0 {
                         f.write_str(", ")?;
                     }
-                    write!(f, "{name}: {}", Self(field_type))?;
+                    write!(f, "{name}: {}", DisplayType(&field_type))?;
                 }
                 f.write_str(" }")
             }
@@ -28,7 +30,7 @@ impl<T: WasmType> Display for DisplayType<T> {
                     if idx != 0 {
                         f.write_str(", ")?;
                     }
-                    write!(f, "{}", Self(ty))?;
+                    write!(f, "{}", DisplayType(&ty))?;
                 }
                 f.write_str(">")
             }
@@ -40,7 +42,7 @@ impl<T: WasmType> Display for DisplayType<T> {
                     }
                     f.write_str(name.as_ref())?;
                     if let Some(ty) = payload {
-                        write!(f, "({})", Self(ty))?;
+                        write!(f, "({})", DisplayType(&ty))?;
                     }
                 }
                 f.write_str(" }")
@@ -56,15 +58,21 @@ impl<T: WasmType> Display for DisplayType<T> {
                 f.write_str(" }")
             }
             WasmTypeKind::Option => {
-                write!(f, "option<{}>", Self(ty.option_some_type().unwrap()))
+                write!(
+                    f,
+                    "option<{}>",
+                    DisplayType(&ty.option_some_type().unwrap())
+                )
             }
             WasmTypeKind::Result => {
                 f.write_str("result")?;
                 match ty.result_types().unwrap() {
                     (None, None) => Ok(()),
-                    (None, Some(err)) => write!(f, "<_, {}>", Self(err)),
-                    (Some(ok), None) => write!(f, "<{}>", Self(ok)),
-                    (Some(ok), Some(err)) => write!(f, "<{}, {}>", Self(ok), Self(err)),
+                    (None, Some(err)) => write!(f, "<_, {}>", DisplayType(&err)),
+                    (Some(ok), None) => write!(f, "<{}>", DisplayType(&ok)),
+                    (Some(ok), Some(err)) => {
+                        write!(f, "<{}, {}>", DisplayType(&ok), DisplayType(&err))
+                    }
                 }
             }
             WasmTypeKind::Flags => {
@@ -109,7 +117,7 @@ impl<T: WasmFunc> Display for DisplayFunc<T> {
             if let Some(name) = param_names.next() {
                 write!(f, "{name}: ")?;
             }
-            DisplayType(ty).fmt(f)?
+            DisplayType(&ty).fmt(f)?
         }
         f.write_str(")")?;
 
@@ -120,7 +128,7 @@ impl<T: WasmFunc> Display for DisplayFunc<T> {
 
         let mut result_names = self.0.result_names();
         if results.len() == 1 {
-            let ty = DisplayType(results.into_iter().next().unwrap());
+            let ty = DisplayType(&results.into_iter().next().unwrap()).to_string();
             if let Some(name) = result_names.next() {
                 write!(f, " -> ({name}: {ty})")
             } else {
@@ -135,7 +143,7 @@ impl<T: WasmFunc> Display for DisplayFunc<T> {
                 if let Some(name) = result_names.next() {
                     write!(f, "{name}: ")?;
                 }
-                DisplayType(ty).fmt(f)?;
+                DisplayType(&ty).fmt(f)?;
             }
             f.write_str(")")
         }

@@ -5,6 +5,7 @@ use std::{fmt::Debug, io::Write};
 use thiserror::Error;
 
 use crate::{
+    lex::Keyword,
     ty::{WasmType, WasmTypeKind},
     val::WasmValue,
 };
@@ -95,6 +96,9 @@ impl<W: Write> Writer<W> {
                         self.write_value(&*val)?;
                     }
                 }
+                if first {
+                    self.write_str(":")?;
+                }
                 self.write_str("}")
             }
             crate::ty::WasmTypeKind::Tuple => {
@@ -109,6 +113,9 @@ impl<W: Write> Writer<W> {
             }
             crate::ty::WasmTypeKind::Variant => {
                 let (name, val) = val.unwrap_variant();
+                if Keyword::from_label(&name).is_some() {
+                    self.write_char('%')?;
+                }
                 self.write_str(name)?;
                 if let Some(val) = val {
                     self.write_str("(")?;
@@ -117,7 +124,13 @@ impl<W: Write> Writer<W> {
                 }
                 Ok(())
             }
-            crate::ty::WasmTypeKind::Enum => self.write_str(val.unwrap_enum()),
+            crate::ty::WasmTypeKind::Enum => {
+                let case = val.unwrap_enum();
+                if Keyword::from_label(&case).is_some() {
+                    self.write_char('%')?;
+                }
+                self.write_str(case)
+            }
             crate::ty::WasmTypeKind::Option => match val.unwrap_option() {
                 Some(val) => {
                     self.write_str("some(")?;

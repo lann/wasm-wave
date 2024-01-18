@@ -18,7 +18,8 @@ use self::ty::{
     EnumType, FlagsType, ListType, OptionType, RecordType, ResultType, TupleType, TypeEnum,
     VariantType,
 };
-use crate::{canonicalize_nan32, canonicalize_nan64};
+use crate::val::{ensure_type_kind, WasmValueError};
+use crate::{canonicalize_nan32, canonicalize_nan64, WasmTypeKind};
 use crate::{ty::maybe_unwrap, val::unwrap_val, WasmType, WasmValue};
 
 pub use func::FuncType;
@@ -127,8 +128,6 @@ macro_rules! impl_primitives {
 impl WasmValue for Value {
     type Type = Type;
 
-    type Error = ValueError;
-
     fn ty(&self) -> Self::Type {
         match &self.0 {
             ValueEnum::Bool(_) => Type::BOOL,
@@ -186,14 +185,13 @@ impl WasmValue for Value {
     fn make_list(
         ty: &Self::Type,
         vals: impl IntoIterator<Item = Self>,
-    ) -> Result<Self, Self::Error> {
-        let element_type = ty
-            .list_element_type()
-            .ok_or_else(|| ValueError::InvalidType(format!("{ty:?} is not a valid list type")))?;
+    ) -> Result<Self, WasmValueError> {
+        ensure_type_kind(ty, WasmTypeKind::List)?;
+        let element_type = ty.list_element_type().unwrap();
         let elements = vals
             .into_iter()
             .map(|v| check_type(&element_type, v))
-            .collect::<Result<_, ValueError>>()?;
+            .collect::<Result<_, _>>()?;
         let ty = maybe_unwrap!(&ty.0, TypeEnum::List).unwrap().clone();
         Ok(Self(ValueEnum::List(List { ty, elements })))
     }
@@ -201,22 +199,18 @@ impl WasmValue for Value {
     fn make_record<'a>(
         ty: &Self::Type,
         fields: impl IntoIterator<Item = (&'a str, Self)>,
-    ) -> Result<Self, Self::Error> {
+    ) -> Result<Self, WasmValueError> {
+        ensure_type_kind(ty, WasmTypeKind::Record)?;
         let mut field_vals: HashMap<_, _> = fields.into_iter().collect();
         let mut fields = Vec::with_capacity(field_vals.len());
         for (name, ty) in ty.record_fields() {
             let val = field_vals
                 .remove(&*name)
-                .ok_or_else(|| ValueError::MissingField(name.into()))?;
+                .ok_or_else(|| WasmValueError::MissingField(name.into()))?;
             fields.push(check_type(&ty, val)?);
         }
-        if fields.is_empty() {
-            return Err(ValueError::InvalidType(format!(
-                "{ty:?} is not a valid record type"
-            )));
-        }
         if let Some(unknown) = field_vals.into_keys().next() {
-            return Err(ValueError::MissingField(unknown.into()));
+            return Err(WasmValueError::UnknownField(unknown.into()));
         }
         let ty = maybe_unwrap!(&ty.0, TypeEnum::Record).unwrap().clone();
         Ok(Self(ValueEnum::Record(Record { ty, fields })))
@@ -225,56 +219,57 @@ impl WasmValue for Value {
     fn make_tuple(
         ty: &Self::Type,
         vals: impl IntoIterator<Item = Self>,
-    ) -> Result<Self, Self::Error> {
+    ) -> Result<Self, WasmValueError> {
+        ensure_type_kind(ty, WasmTypeKind::Tuple)?;
         let types = ty.tuple_element_types().collect::<Vec<_>>();
-        let elements = vals
-            .into_iter()
-            .enumerate()
-            .map(|(idx, val)| {
-                let ty = types
-                    .get(idx)
-                    .ok_or_else(|| ValueError::InvalidValue("too many tuple values".into()))?;
-                check_type(ty, val)
-            })
-            .collect::<Result<Vec<_>, ValueError>>()?;
+        let elements = Vec::from_iter(vals);
         if types.len() != elements.len() {
-            return Err(ValueError::InvalidValue(format!(
-                "tuple needs {} values; got {}",
-                types.len(),
-                elements.len()
-            )));
+            return Err(WasmValueError::WrongNumberOfTupleValues {
+                want: types.len(),
+                got: elements.len(),
+            });
+        }
+        for (ty, val) in types.iter().zip(&elements) {
+            if &val.ty() != ty {
+                return Err(WasmValueError::wrong_value_type(&val.ty(), val));
+            }
         }
         let ty = maybe_unwrap!(&ty.0, TypeEnum::Tuple).unwrap().clone();
         Ok(Self(ValueEnum::Tuple(Tuple { ty, elements })))
     }
 
-    fn make_variant(ty: &Self::Type, case: &str, val: Option<Self>) -> Result<Self, Self::Error> {
+    fn make_variant(
+        ty: &Self::Type,
+        case_name: &str,
+        val: Option<Self>,
+    ) -> Result<Self, WasmValueError> {
+        ensure_type_kind(ty, WasmTypeKind::Variant)?;
         let (case, payload_type) = ty
             .variant_cases()
             .enumerate()
-            .find_map(|(idx, (name, ty))| (name == case).then_some((idx, ty)))
-            .ok_or_else(|| ValueError::InvalidValue(format!("unknown case {case:?} for {ty:?}")))?;
-        let payload = check_option_type(&payload_type, val)?;
+            .find_map(|(idx, (name, ty))| (name == case_name).then_some((idx, ty)))
+            .ok_or_else(|| WasmValueError::UnknownCase(case_name.into()))?;
+        let payload = check_payload_type(case_name, &payload_type, val)?;
         let ty = maybe_unwrap!(&ty.0, TypeEnum::Variant).unwrap().clone();
         Ok(Self(ValueEnum::Variant(Variant { ty, case, payload })))
     }
 
-    fn make_enum(ty: &Self::Type, case: &str) -> Result<Self, Self::Error> {
+    fn make_enum(ty: &Self::Type, case: &str) -> Result<Self, WasmValueError> {
+        ensure_type_kind(ty, WasmTypeKind::Enum)?;
         let case = ty
             .enum_cases()
             .position(|name| name == case)
-            .ok_or_else(|| ValueError::InvalidValue(format!("unknown case {case:?} for {ty:?}")))?;
+            .ok_or_else(|| WasmValueError::UnknownCase(case.into()))?;
         let ty = maybe_unwrap!(&ty.0, TypeEnum::Enum).unwrap().clone();
         Ok(Self(ValueEnum::Enum(Enum { ty, case })))
     }
 
-    fn make_option(ty: &Self::Type, val: Option<Self>) -> Result<Self, Self::Error> {
-        let some_type = ty
-            .option_some_type()
-            .ok_or_else(|| ValueError::InvalidType(format!("{ty:?} is not an option type")))?;
-        let value = val
-            .map(|val| Ok(Box::new(check_type(&some_type, val)?)))
-            .transpose()?;
+    fn make_option(ty: &Self::Type, val: Option<Self>) -> Result<Self, WasmValueError> {
+        ensure_type_kind(ty, WasmTypeKind::Option)?;
+        let value = match val {
+            Some(val) => Some(Box::new(check_type(&ty.option_some_type().unwrap(), val)?)),
+            None => None,
+        };
         let ty = maybe_unwrap!(&ty.0, TypeEnum::Option).unwrap().clone();
         Ok(Self(ValueEnum::Option(OptionValue { ty, value })))
     }
@@ -282,13 +277,12 @@ impl WasmValue for Value {
     fn make_result(
         ty: &Self::Type,
         val: Result<Option<Self>, Option<Self>>,
-    ) -> Result<Self, Self::Error> {
-        let (ok_type, err_type) = ty
-            .result_types()
-            .ok_or_else(|| ValueError::InvalidType(format!("{ty:?} is not a result type")))?;
+    ) -> Result<Self, WasmValueError> {
+        ensure_type_kind(ty, WasmTypeKind::Result)?;
+        let (ok_type, err_type) = ty.result_types().unwrap();
         let value = match val {
-            Ok(ok) => Ok(check_option_type(&ok_type, ok)?),
-            Err(err) => Err(check_option_type(&err_type, err)?),
+            Ok(ok) => Ok(check_payload_type("ok", &ok_type, ok)?),
+            Err(err) => Err(check_payload_type("err", &err_type, err)?),
         };
         let ty = maybe_unwrap!(&ty.0, TypeEnum::Result).unwrap().clone();
         Ok(Self(ValueEnum::Result(ResultValue { ty, value })))
@@ -297,7 +291,8 @@ impl WasmValue for Value {
     fn make_flags<'a>(
         ty: &Self::Type,
         names: impl IntoIterator<Item = &'a str>,
-    ) -> Result<Self, Self::Error> {
+    ) -> Result<Self, WasmValueError> {
+        ensure_type_kind(ty, WasmTypeKind::Flags)?;
         let flag_names = ty.flags_names().collect::<Vec<_>>();
         let mut flags = names
             .into_iter()
@@ -305,9 +300,9 @@ impl WasmValue for Value {
                 flag_names
                     .iter()
                     .position(|flag| flag == name)
-                    .ok_or_else(|| ValueError::InvalidValue(format!("unknown flag {name:?}")))
+                    .ok_or_else(|| WasmValueError::UnknownCase(name.into()))
             })
-            .collect::<Result<Vec<_>, ValueError>>()?;
+            .collect::<Result<Vec<_>, WasmValueError>>()?;
         // Flags values don't logically contain an ordering of the flags. Sort
         // the flags values so that equivalent flags values compare equal.
         flags.sort();
@@ -385,49 +380,23 @@ fn cow<T: ToOwned + ?Sized>(t: &T) -> Cow<T> {
     Cow::Borrowed(t)
 }
 
-fn check_type(expected: &Type, val: Value) -> Result<Value, ValueError> {
-    let got = val.ty();
-    if &got != expected {
-        return Err(ValueError::InvalidType(format!(
-            "expected {expected:?}, got {got:?}"
-        )));
+fn check_type(expected: &Type, val: Value) -> Result<Value, WasmValueError> {
+    if &val.ty() == expected {
+        Ok(val)
+    } else {
+        Err(WasmValueError::wrong_value_type(expected, &val))
     }
-    Ok(val)
 }
 
-fn check_option_type(
+fn check_payload_type(
+    name: &str,
     expected: &Option<Type>,
     val: Option<Value>,
-) -> Result<Option<Box<Value>>, ValueError> {
+) -> Result<Option<Box<Value>>, WasmValueError> {
     match (expected, val) {
-        (Some(ty), Some(val)) => Ok(Some(Box::new(check_type(ty, val)?))),
+        (Some(payload_type), Some(val)) => Ok(Some(Box::new(check_type(payload_type, val)?))),
         (None, None) => Ok(None),
-        (ty, val) => Err(ValueError::InvalidValue(format!(
-            "invalid payload {val:?}; expected {ty:?}"
-        ))),
+        (Some(_), None) => Err(WasmValueError::MissingPayload(name.into())),
+        (None, Some(_)) => Err(WasmValueError::UnexpectedPayload(name.into())),
     }
-}
-
-/// Value errors.
-#[derive(Debug, thiserror::Error)]
-pub enum ValueError {
-    /// Invalid func type.
-    #[error("invalid func type: {0}")]
-    InvalidFuncType(String),
-
-    /// Invalid type.
-    #[error("invalid type: {0}")]
-    InvalidType(String),
-
-    /// Invalid value.
-    #[error("invalid value: {0}")]
-    InvalidValue(String),
-
-    /// Missing record field.
-    #[error("missing field {0:?}")]
-    MissingField(Box<str>),
-
-    /// Unknown record field.
-    #[error("unknown field {0:?}")]
-    UnknownField(Box<str>),
 }

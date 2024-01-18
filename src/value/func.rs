@@ -1,6 +1,6 @@
 use crate::func::WasmFunc;
 
-use super::{Type, ValueError};
+use super::{Type, WasmValueError};
 
 /// A FuncType represents the parameter and result type(s) of a Wasm func.
 #[derive(Clone, PartialEq)]
@@ -17,16 +17,14 @@ impl FuncType {
     pub fn new(
         params: impl Into<Vec<(String, Type)>>,
         results: impl Into<Vec<(String, Type)>>,
-    ) -> Result<Self, ValueError> {
+    ) -> Result<Self, WasmValueError> {
         let params = params.into();
         if params.iter().any(|(name, _)| name.is_empty()) {
-            return Err(ValueError::InvalidFuncType(
-                "func params must be named".into(),
-            ));
+            return Err(WasmValueError::Other("func params must be named".into()));
         }
         let results = results.into();
         if results.len() > 1 && results.iter().any(|(name, _)| name.is_empty()) {
-            return Err(ValueError::InvalidFuncType(
+            return Err(WasmValueError::Other(
                 "funcs with more than one result must have all results named".into(),
             ));
         }
