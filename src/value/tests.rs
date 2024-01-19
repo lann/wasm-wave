@@ -121,6 +121,7 @@ fn flags_round_trips() {
 fn test_value_round_trip(val: Value) {
     let ty = val.ty();
     let serialized = crate::to_string(&val).unwrap();
-    let deserialized: Value = crate::from_str(&ty, &serialized).unwrap();
+    let deserialized: Value = crate::from_str(&ty, &serialized)
+        .unwrap_or_else(|err| panic!("failed to deserialize {serialized:?}: {err}"));
     assert_eq!(deserialized, val, "for {val:?}");
 }

@@ -276,7 +276,7 @@ impl<'source> Parser<'source> {
             let span = self.lex.span();
             match token_res {
                 Some(Ok(token)) => Ok((token, span)),
-                Some(Err(err)) => Err(ParserError::new(err.into(), span)),
+                Some(Err(err)) => Err(ParserError::lexing(err, span)),
                 None => Err(ParserError::new(ParserErrorKind::UnexpectedEnd, span)),
             }
         })
@@ -380,6 +380,13 @@ impl ParserError {
         }
     }
 
+    fn lexing(err: LexingError, span: Span) -> Self {
+        match err {
+            LexingError::InvalidChar(span) => Self::new(ParserErrorKind::InvalidChar, span),
+            LexingError::InvalidToken => Self::new(ParserErrorKind::InvalidToken, span),
+        }
+    }
+
     /// Returns the [`ParserErrorKind`] of this error.
     pub fn kind(&self) -> ParserErrorKind {
         self.kind
@@ -439,15 +446,6 @@ impl Display for ParserErrorKind {
             ParserErrorKind::WasmValueError => "error converting Wasm value",
         };
         write!(f, "{msg}")
-    }
-}
-
-impl From<LexingError> for ParserErrorKind {
-    fn from(err: LexingError) -> Self {
-        match err {
-            LexingError::InvalidChar => Self::InvalidChar,
-            LexingError::InvalidToken => Self::InvalidToken,
-        }
     }
 }
 

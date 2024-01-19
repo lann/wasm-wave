@@ -2,7 +2,7 @@
 
 use std::fmt::Display;
 
-use logos::{Lexer, Logos};
+use logos::{Lexer, Logos, Span};
 
 /// Represents a WAVE token.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Logos)]
@@ -69,7 +69,7 @@ fn validate_char(lex: &mut Lexer<Token>) -> Result<(), LexingError> {
     if s.starts_with('\\') || s.chars().count() == 1 {
         Ok(())
     } else {
-        Err(LexingError::InvalidChar)
+        Err(LexingError::InvalidChar(lex.span()))
     }
 }
 
@@ -104,7 +104,7 @@ impl Keyword {
 #[derive(Default, Debug, Clone, PartialEq)]
 pub enum LexingError {
     /// Invalid char token.
-    InvalidChar,
+    InvalidChar(Span),
     /// Invalid token.
     #[default]
     InvalidToken,
@@ -114,7 +114,7 @@ impl Display for LexingError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::InvalidToken => write!(f, "invalid token"),
-            Self::InvalidChar => write!(f, "invalid char literal"),
+            Self::InvalidChar(span) => write!(f, "invalid char literal at {span:?}"),
         }
     }
 }

@@ -73,5 +73,4 @@ word ::= [a-z][a-z0-9]*
 ```
 
 * "`Unicode scalar value`" is defined by Unicode
-* "`Unicode whitespace`" is any Unicode character with property `White_Space=yes`
 * `escape-unicode` must identify a valid Unicode scalar value.
