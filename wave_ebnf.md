@@ -18,7 +18,7 @@ value ::= number
         | record
 
 value-ws ::= ws value ws
-ws ::= <Unicode whitespace>*
+ws ::= [ \t\r\n\f]*
 
 number ::= number_finite
          | 'nan'
@@ -59,7 +59,8 @@ flags ::= '{' ws '}'
 flags-seq ::= ws label ws
             | flags-seq ',' label
 
-record ::= '{' record-fields ','? '}'
+record ::= '{' ':' '}'
+         | '{' record-fields ','? '}'
 record-fields ::= ws record-field ws
                 | record-fields ',' record-field
 record-field ::= label ws ':' ws value
