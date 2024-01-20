@@ -99,7 +99,7 @@ fn main() {
         _ => snapbox::Action::Overwrite,
     };
     Harness::new("tests/ui", setup, test)
-        .select(["*.wave"])
+        .select(["*.waves"])
         .action(action)
         .test();
 }
