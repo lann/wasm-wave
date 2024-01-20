@@ -8,7 +8,7 @@ use std::{
 };
 
 use crate::{
-    parser::{flattenable, ParserError, ParserErrorKind, Span},
+    parser::{ParserError, ParserErrorKind, Span},
     WasmType, WasmTypeKind, WasmValue,
 };
 use itertools::{EitherOrBoth, Itertools};
@@ -377,6 +377,11 @@ impl Node {
     fn error(&self, kind: ParserErrorKind) -> ParserError {
         ParserError::new(kind, self.span())
     }
+}
+
+fn flattenable(kind: WasmTypeKind) -> bool {
+    use WasmTypeKind::*;
+    !matches!(kind, Option | Result)
 }
 
 fn unescape(chars: &mut Chars) -> Result<Option<char>, ()> {

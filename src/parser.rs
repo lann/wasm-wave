@@ -351,10 +351,6 @@ impl<'source> Parser<'source> {
     }
 }
 
-pub(crate) fn flattenable(kind: WasmTypeKind) -> bool {
-    use WasmTypeKind::*;
-    !matches!(kind, Variant | Enum | Option | Result)
-}
 /// A WAVE parsing error.
 #[derive(Clone, Debug)]
 pub struct ParserError {
