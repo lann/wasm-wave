@@ -1,6 +1,6 @@
 # WAVE: Web Assembly Value Encoding
 
-WAVE is a human-oriented text encoding of WebAssembly Component Model values. It is based largely on the
+WAVE is a human-oriented text encoding of WebAssembly Component Model values. It is designed to be consistent with the
 [WIT IDL format](https://github.com/WebAssembly/component-model/blob/673d5c43c3cc0f4aeb8996a5c0931af623f16808/design/mvp/WIT.md).
 
 |Type|Example Values
@@ -38,23 +38,36 @@ Values are encoded as Unicode text. UTF-8 should be used wherever an interoperab
 
 Whitespace is _insignificant between tokens_ and _significant within tokens_: keywords, labels, chars, and strings.
 
+### Keywords
+
+Several tokens are reserved WAVE keywords: `true`, `false`, `inf`, `nan`, `some`, `none`, `ok`, `err`. Variant or enum cases that match one of these keywords must be prefixed with `%`.
+
 ### Labels
 
-Kebab-case labels are used for record fields, variant cases, enum cases, and flags. Labels use ASCII alphanumeric characters and hyphens, following the [Wit identifier syntax](https://github.com/WebAssembly/component-model/blob/main/design/mvp/WIT.md#identifiers).
+Kebab-case labels are used for record fields, variant cases, enum cases, and flags. Labels use ASCII alphanumeric characters and hyphens, following the [Wit identifier syntax](https://github.com/WebAssembly/component-model/blob/main/design/mvp/WIT.md#identifiers):
+
+- Labels consist of one or more hypen-separated words.
+  - `one`, `two-words`
+- Words consist of one ASCII letter followed by any number of ASCII alphanumeric characters.
+  - `q`, `abc123`
+- Each word can contain lowercase or uppercase characters but not both; each word in a label can use a different (single) case.
+  - `HTTP3`, `method-GET`
+- Any label may be prefixed with `%`; this is not part of the label itself but allows for representing labels that would otherwise be parsed as keywords.
+  - `%err`, `%non-keyword`
 
 ### Bools
 
-Bools are encoded as the keywords `false` or `true`.
+Bools are encoded as one of the keywords `false` or `true`.
 
 ### Integers
 
 Integers are encoded as base-10 numbers.
 
-> TBD: hex/bin repr? `0xab`, `0b1011`
+> TBD: hex/bin repr? e.g. `0xab`, `0b1011`
 
 ### Floats
 
-Floats are encoded as JSON numbers or one of the keywords `nan`, `inf`, or `-inf`.
+Floats are encoded as JSON numbers or one of the keywords `nan`, (not a number) `inf` (infinity), or `-inf` (negative infinity).
 
 ### Chars
 
@@ -68,7 +81,7 @@ Chars are encoded as `'<char>'`, where `<char>` is one of:
   - `\t` → U+9 (HT)
   - `\n` → U+A (LF)
   - `\r` → U+D (CR)
-  - `\u{···}` → U+··· (where `···` is hex Unicode Scalar Value)
+  - `\u{···}` → U+··· (where `···` is a hexadecimal Unicode Scalar Value)
 
 Escaping `\` and `'` is mandatory for chars.
 
@@ -86,11 +99,11 @@ Tuples are encoded as a parenthesized sequence of comma-separated values. Traili
 
 Lists are encoded as a square-braketed sequence of comma-separated values. Trailing commas are permitted.
 
-`list<char>` → `['a', 'b', 'c']`
+`list<char>` → `[]`, `['a', 'b', 'c']`
 
 ### Records
 
-Records are encoded as curly-braced set of comma-separated record entries. Trailing commas are permitted. Each record entry consists of a field label, a colon, and a value. Record entries with the `option`-typed value `none` may be omitted. Fields may be present in any order.
+Records are encoded as curly-braced set of comma-separated record entries. Trailing commas are permitted. Each record entry consists of a field label, a colon, and a value. Fields may be present in any order. Record entries with the `option`-typed value `none` may be omitted; if all of a record's fields are omitted in this way the "empty" record must be encoded as `{:}` (to disambiguate from an empty `flags` value).
 
 ```clike
 record example {
@@ -101,34 +114,49 @@ record example {
 
 → `{must-have: 123}` = `{must-have: 123, optional: none,}`
 
+```clike
+record all-optional {
+  optional: option<u8>,
+}
+```
+
+→ `{:}` = `{optional: none}`
+
+> Note: Field labels _may_ be prefixed with `%` but this is never required.
+
 ### Variants
 
 Variants are encoded as a case label. If the case has a payload, the label is followed by the parenthesized case payload value.
 
-`variant error { eof, other(string) }` → `other("oops")`
+If a variant case matches a WAVE keyword it must be prefixed with `%`.
+
+```clike
+variant response {
+  empty,
+  body(list<u8>),
+  err(string),
+}
+```
+
+→ `empty`, `body([79, 75])`, `%err("oops")`
 
 ### Enums
 
 Enums are encoded as a case label.
 
-`enum hand { left, right }` → `left`
+If an enum case matches a WAVE keyword it must be prefixed with `%`.
+
+`enum status { ok, not-found }` → `%ok`, `not-found`
 
 ### Options
 
-Options may be encoded in their variant form
-(e.g. `some(1)` or `none`). A `some` value may also be
-encoded as the "flat" payload value itself, but only if
-the payload is not an option, result, variant, or enum type<sup>†</sup>.
+Options may be encoded in their variant form (e.g. `some(...)` or `none`). A `some` value may also be encoded as the "flat" payload value itself, but only if the payload is not an option or result type.
 
 - `option<u8>` → `123` = `some(123)`
-- `option<option<u8>>` → `some(123)` = `some(some(123))`
 
 ### Results
 
-Results may be encoded in their variant form
-(e.g. `ok(1)`, `err("oops")`). An `ok` value may also be
-encoded as the "flat" payload value itself, but only if
-it has a payload and the payload is not an option, result, variant, or enum type<sup>†</sup>.
+Results may be encoded in their variant form (e.g. `ok(...)`, `err("oops")`). An `ok` value may also be encoded as the "flat" payload value itself, but only if it has a payload which is not an option or result type.
 
 - `result<u8>` → `123` = `ok(123)`
 - `result<_, string>` → `ok`, `err("oops")`
@@ -136,9 +164,11 @@ it has a payload and the payload is not an option, result, variant, or enum type
 
 ### Flags
 
-Flags are encoded as a curly-braced set of comma-separated flag labels. Trailing commas are permitted.
+Flags are encoded as a curly-braced set of comma-separated flag labels in any order. Trailing commas are permitted.
 
-`flags perms { read, write, exec }` → `{read, write,}`
+`flags perms { read, write, exec }` → `{write, read,}`
+
+> Note: Flags _may_ be prefixed with `%` but this is never required.
 
 > TBD: Allow record form? `{read: true, write: true, exec: false}`
 
@@ -162,11 +192,9 @@ with-result() -> ok("result")
 
 ### Function arguments
 
-Arguments are encoded as a sequence of comma-separated
-values.
+Arguments are encoded as a sequence of comma-separated values.
 
-Any number of `option` `none` values at the end of the
-sequence may be omitted.
+Any number of `option` `none` values at the end of the sequence may be omitted.
 
 ```clike
 // f: func(a: option<u8>, b: option<u8>, c: option<u8>)
@@ -199,7 +227,5 @@ Results are encoded in one of several ways depending on the number of result val
 ```
 
 ---
-
-<sup>†</sup> These payload type restrictions on "flat" `option` `some`  and `result` `ok` encodings simplify parsing and prevent ambiguity where a payload value encoding "looks like" the outer value, e.g. an `enum` with a `none` case or a `variant` with an `ok` case. While it may seem that this restriction could be loosened to only exclude types that actually have such an ambiguous case name, a subtype-compatible change to the payload type could cause previously-encoded data to become ambiguous retroactively.
 
 :ocean:
