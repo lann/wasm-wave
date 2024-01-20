@@ -64,7 +64,7 @@ impl WasmValue for wasmtime::Val {
         let (Some(l), Some(h)) = (l_val.i64(), h_val.i64()) else {
             return Err(WasmValueError::other("expected 2 i64s (v64x2)"));
         };
-        Ok(Self::V128((h as u128) << 64 | (l as u128)))
+        Ok(Self::V128(((h as u128) << 64 | (l as u128)).into()))
     }
 
     fn unwrap_s32(&self) -> i32 {
@@ -86,7 +86,7 @@ impl WasmValue for wasmtime::Val {
     }
 
     fn unwrap_tuple(&self) -> Box<dyn Iterator<Item = Cow<Self>> + '_> {
-        let v = *unwrap_val!(self, Self::V128, "tuple");
+        let v = unwrap_val!(self, Self::V128, "tuple").as_u128();
         let low = v as i64;
         let high = (v >> 64) as i64;
         Box::new(
@@ -126,7 +126,7 @@ mod tests {
             (f32::INFINITY.into(), "inf"),
             (f32::NEG_INFINITY.into(), "-inf"),
             (
-                Val::V128(0x1234567890abcdef1122334455667788),
+                Val::V128(0x1234567890abcdef1122334455667788.into()),
                 "(1234605616436508552, 1311768467294899695)",
             ),
         ] {
