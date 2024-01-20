@@ -7,7 +7,7 @@ use logos::{Lexer, Logos};
 
 use crate::{
     ast::{Node, NodeType},
-    lex::{Keyword, LexingError, Token},
+    lex::{Keyword, Token},
     untyped::UntypedValue,
     WasmValue,
 };
@@ -277,7 +277,10 @@ impl<'source> Parser<'source> {
             let span = self.lex.span();
             match token_res {
                 Some(Ok(token)) => Ok((token, span)),
-                Some(Err(err)) => Err(ParserError::lexing(err, span)),
+                Some(Err(maybe_span)) => {
+                    let span = maybe_span.unwrap_or(span);
+                    Err(ParserError::new(ParserErrorKind::InvalidToken, span))
+                }
                 None => Err(ParserError::new(ParserErrorKind::UnexpectedEnd, span)),
             }
         })
@@ -377,13 +380,6 @@ impl ParserError {
         }
     }
 
-    fn lexing(err: LexingError, span: Span) -> Self {
-        match err {
-            LexingError::InvalidChar(span) => Self::new(ParserErrorKind::InvalidChar, span),
-            LexingError::InvalidToken => Self::new(ParserErrorKind::InvalidToken, span),
-        }
-    }
-
     /// Returns the [`ParserErrorKind`] of this error.
     pub fn kind(&self) -> ParserErrorKind {
         self.kind
@@ -414,7 +410,6 @@ impl Error for ParserError {}
 pub enum ParserErrorKind {
     EmptyTuple,
     MultipleChars,
-    InvalidChar,
     InvalidEscape,
     InvalidParams,
     InvalidToken,
@@ -431,7 +426,6 @@ impl Display for ParserErrorKind {
         let msg = match self {
             ParserErrorKind::EmptyTuple => "empty tuple",
             ParserErrorKind::MultipleChars => "multiple characters in char value",
-            ParserErrorKind::InvalidChar => "invalid character",
             ParserErrorKind::InvalidEscape => "invalid character escape",
             ParserErrorKind::InvalidParams => "invalid params",
             ParserErrorKind::InvalidToken => "invalid token",

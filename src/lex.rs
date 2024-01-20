@@ -6,7 +6,7 @@ use logos::{Lexer, Logos, Span};
 
 /// A [`logos::Logos`] implementation that represents a WAVE token.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Logos)]
-#[logos(error = LexingError)]
+#[logos(error = Option<Span>)]
 #[logos(skip r"[ \t\n\r]+")]
 #[logos(subpattern label_word = r"[a-z][a-z0-9]*|[A-Z][A-Z0-9]*")]
 #[logos(subpattern char_escape = r#"\\['"tnr\\]|\\u\{[0-9a-fA-F]{1,6}\}"#)]
@@ -64,12 +64,12 @@ impl Display for Token {
     }
 }
 
-fn validate_char(lex: &mut Lexer<Token>) -> Result<(), LexingError> {
+fn validate_char(lex: &mut Lexer<Token>) -> Result<(), Option<Span>> {
     let s = &lex.slice()[1..lex.slice().len() - 1];
     if s.starts_with('\\') || s.chars().count() == 1 {
         Ok(())
     } else {
-        Err(LexingError::InvalidChar(lex.span()))
+        Err(Some(lex.span()))
     }
 }
 
@@ -99,23 +99,3 @@ impl Keyword {
         })
     }
 }
-
-/// WAVE lexing errors
-#[derive(Default, Debug, Clone, PartialEq)]
-pub enum LexingError {
-    /// Invalid char token.
-    InvalidChar(Span),
-    /// Invalid token.
-    #[default]
-    InvalidToken,
-}
-
-impl Display for LexingError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::InvalidToken => write!(f, "invalid token"),
-            Self::InvalidChar(span) => write!(f, "invalid char literal at {span:?}"),
-        }
-    }
-}
-impl std::error::Error for LexingError {}
