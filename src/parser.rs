@@ -3,20 +3,17 @@
 use std::{collections::HashSet, error::Error, fmt::Display};
 
 use indexmap::IndexMap;
-use logos::{Lexer, Logos};
 
 use crate::{
     ast::{Node, NodeType},
-    lex::{Keyword, Token},
+    lex::{Keyword, Lexer, Span, Token},
     untyped::UntypedValue,
     WasmValue,
 };
 
-pub use logos::Span;
-
 /// A Web Assembly Value Encoding parser.
 pub struct Parser<'source> {
-    lex: Lexer<'source, Token>,
+    lex: Lexer<'source>,
     curr: Option<(Token, Span)>,
     next: Option<Result<(Token, Span), ParserError>>,
 }
@@ -24,11 +21,11 @@ pub struct Parser<'source> {
 impl<'source> Parser<'source> {
     /// Returns a new Parser of the given source.
     pub fn new(source: &'source str) -> Self {
-        Self::with_lexer(Token::lexer(source))
+        Self::with_lexer(Lexer::new(source))
     }
 
     /// Returns a new Parser with the given [`Lexer`].
-    pub fn with_lexer(lexer: Lexer<'source, Token>) -> Self {
+    pub fn with_lexer(lexer: Lexer<'source>) -> Self {
         Self {
             lex: lexer,
             curr: None,

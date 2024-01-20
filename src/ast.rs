@@ -8,7 +8,8 @@ use std::{
 };
 
 use crate::{
-    parser::{ParserError, ParserErrorKind, Span},
+    lex::Span,
+    parser::{ParserError, ParserErrorKind},
     wasm::{WasmType, WasmTypeKind, WasmValue},
 };
 use itertools::{EitherOrBoth, Itertools};

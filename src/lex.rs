@@ -2,10 +2,13 @@
 
 use std::fmt::Display;
 
-use logos::{Lexer, Logos, Span};
+pub use logos::Span;
 
-/// A WAVE token implementing [`logos::Logos`]
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Logos)]
+/// A WAVE `logos::Lexer`
+pub type Lexer<'source> = logos::Lexer<'source, Token>;
+
+/// A WAVE token
+#[derive(Clone, Copy, Debug, PartialEq, Eq, logos::Logos)]
 #[logos(error = Option<Span>)]
 #[logos(skip r"[ \t\n\r]+")]
 #[logos(subpattern label_word = r"[a-z][a-z0-9]*|[A-Z][A-Z0-9]*")]
@@ -64,7 +67,7 @@ impl Display for Token {
     }
 }
 
-fn validate_char(lex: &mut Lexer<Token>) -> Result<(), Option<Span>> {
+fn validate_char(lex: &mut Lexer) -> Result<(), Option<Span>> {
     let s = &lex.slice()[1..lex.slice().len() - 1];
     if s.starts_with('\\') || s.chars().count() == 1 {
         Ok(())
