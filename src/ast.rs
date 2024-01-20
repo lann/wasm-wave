@@ -95,13 +95,13 @@ impl Node {
     }
 
     /// Returns an iterator of value nodes if this node represents a tuple.
-    pub fn as_tuple(&self) -> Result<impl Iterator<Item = &Node>, ParserError> {
+    pub fn as_tuple(&self) -> Result<impl ExactSizeIterator<Item = &Node>, ParserError> {
         self.ensure_type(NodeType::Tuple)?;
         Ok(self.children.iter())
     }
 
     /// Returns an iterator of value nodes if this node represents a list.
-    pub fn as_list(&self) -> Result<impl Iterator<Item = &Node>, ParserError> {
+    pub fn as_list(&self) -> Result<impl ExactSizeIterator<Item = &Node>, ParserError> {
         self.ensure_type(NodeType::List)?;
         Ok(self.children.iter())
     }
@@ -111,14 +111,12 @@ impl Node {
     pub fn as_record<'this, 'src>(
         &'this self,
         src: &'src str,
-    ) -> Result<impl Iterator<Item = (&'src str, &'this Node)>, ParserError> {
+    ) -> Result<impl ExactSizeIterator<Item = (&'src str, &'this Node)>, ParserError> {
         self.ensure_type(NodeType::Record)?;
-        let mut children = self.children.iter();
-        Ok(std::iter::from_fn(move || {
-            let label = children.next()?.as_label(src).unwrap();
-            let value = children.next().unwrap();
-            Some((label, value))
-        }))
+        Ok(self
+            .children
+            .chunks(2)
+            .map(|chunk| (chunk[0].as_label(src).unwrap(), &chunk[1])))
     }
 
     /// Returns a variant label and optional payload if this node can represent
@@ -362,7 +360,7 @@ impl Node {
         ParserError::with_detail(ParserErrorKind::WasmValueError, self.span(), err)
     }
 
-    fn slice<'src>(&self, src: &'src str) -> &'src str {
+    pub(crate) fn slice<'src>(&self, src: &'src str) -> &'src str {
         &src[self.span()]
     }
 

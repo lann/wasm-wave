@@ -64,49 +64,21 @@ impl std::fmt::Display for UntypedValue<'_> {
 fn fmt_node(f: &mut impl std::fmt::Write, node: &Node, src: &str) -> std::fmt::Result {
     use crate::ast::NodeType::*;
     match node.ty() {
-        BoolTrue | BoolFalse | Number | Char | String | Label => {
-            write!(f, "{}", &src[node.span()])
-        }
-        Tuple => {
-            f.write_char('(')?;
-            let mut first = true;
-            for element in node.as_tuple()? {
-                if first {
-                    first = false;
-                } else {
-                    f.write_str(", ")?;
-                }
-                fmt_node(f, element, src)?;
-            }
-            f.write_char(')')
-        }
-        List => {
-            f.write_char('[')?;
-            let mut first = true;
-            for element in node.as_list()? {
-                if first {
-                    first = false;
-                } else {
-                    f.write_str(", ")?;
-                }
-                fmt_node(f, element, src)?;
-            }
-            f.write_char(']')
-        }
+        BoolTrue | BoolFalse | Number | Char | String | Label => f.write_str(node.slice(src)),
+        Tuple => fmt_sequence(f, '(', ')', node.as_tuple()?, src),
+        List => fmt_sequence(f, '[', ']', node.as_list()?, src),
         Record => {
+            let fields = node.as_record(src)?;
+            if fields.len() == 0 {
+                return f.write_str("{:}");
+            }
             f.write_char('{')?;
-            let mut first = true;
-            for (name, value) in node.as_record(src)? {
-                if first {
-                    first = false;
-                } else {
+            for (idx, (name, value)) in node.as_record(src)?.enumerate() {
+                if idx != 0 {
                     f.write_str(", ")?;
                 }
                 write!(f, "{name}: ")?;
                 fmt_node(f, value, src)?;
-            }
-            if first {
-                f.write_char(':')?;
             }
             f.write_char('}')
         }
@@ -115,7 +87,6 @@ fn fmt_node(f: &mut impl std::fmt::Write, node: &Node, src: &str) -> std::fmt::R
             if Keyword::from_label(label).is_some() {
                 f.write_char('%')?;
             }
-            // TODO: '%'-escape some label (?)
             fmt_variant(f, label, payload, src)
         }
         OptionSome => fmt_variant(f, "some", node.as_option()?, src),
@@ -124,11 +95,8 @@ fn fmt_node(f: &mut impl std::fmt::Write, node: &Node, src: &str) -> std::fmt::R
         ResultErr => fmt_variant(f, "err", node.as_result()?.unwrap_err(), src),
         Flags => {
             f.write_char('{')?;
-            let mut first = true;
-            for flag in node.as_flags(src)? {
-                if first {
-                    first = false;
-                } else {
+            for (idx, flag) in node.as_flags(src)?.enumerate() {
+                if idx != 0 {
                     f.write_str(", ")?;
                 }
                 f.write_str(flag)?;
@@ -138,13 +106,30 @@ fn fmt_node(f: &mut impl std::fmt::Write, node: &Node, src: &str) -> std::fmt::R
     }
 }
 
+fn fmt_sequence<'a>(
+    f: &mut impl std::fmt::Write,
+    open: char,
+    close: char,
+    nodes: impl Iterator<Item = &'a Node>,
+    src: &str,
+) -> std::fmt::Result {
+    f.write_char(open)?;
+    for (idx, node) in nodes.enumerate() {
+        if idx != 0 {
+            f.write_str(", ")?;
+        }
+        fmt_node(f, node, src)?;
+    }
+    f.write_char(close)
+}
+
 fn fmt_variant(
     f: &mut impl std::fmt::Write,
-    label: &str,
+    case: &str,
     payload: Option<&Node>,
     src: &str,
 ) -> std::fmt::Result {
-    f.write_str(label)?;
+    f.write_str(case)?;
     if let Some(node) = payload {
         f.write_char('(')?;
         fmt_node(f, node, src)?;
