@@ -63,7 +63,7 @@ impl Node {
     }
 
     /// Returns a char value if this node represents a valid char.
-    fn as_char(&self, src: &str) -> Result<char, ParserError> {
+    pub fn as_char(&self, src: &str) -> Result<char, ParserError> {
         self.ensure_type(NodeType::Char)?;
         let mut chars = self.slice(src).chars();
         assert_eq!(chars.next(), Some('\''));
