@@ -6,7 +6,7 @@ description = "Web Assembly Value Encoding"
 license = "Apache-2.0"
 documentation = "https://docs.rs/wasm-wave"
 categories = ["wasm", "encoding", "parser-implementations"]
-repository = "https://github.com/lann/wave"
+repository = "https://github.com/lann/wasm-wave"
 readme = "README.md"
 edition = "2021"
 
