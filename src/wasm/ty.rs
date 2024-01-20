@@ -126,7 +126,7 @@ pub trait WasmType: Clone + Sized {
     }
 }
 
-macro_rules! maybe_unwrap {
+macro_rules! maybe_unwrap_type {
     ($ty:expr, $case:path) => {
         match $ty {
             $case(v) => Some(v),
@@ -134,5 +134,4 @@ macro_rules! maybe_unwrap {
         }
     };
 }
-
-pub(crate) use maybe_unwrap;
+pub(crate) use maybe_unwrap_type;

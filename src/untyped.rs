@@ -1,3 +1,5 @@
+//! Untyped value
+
 use std::borrow::Cow;
 
 use crate::{ast::Node, lex::Keyword, parser::ParserError, Parser, WasmValue};
@@ -25,7 +27,7 @@ impl<'source> UntypedValue<'source> {
         Ok(val)
     }
 
-    /// Creates an owned value, copying if necessary.
+    /// Creates an owned value, copying the entire source string if necessary.
     pub fn into_owned(self) -> UntypedValue<'static> {
         UntypedValue::new(self.source.into_owned(), self.node)
     }
@@ -84,7 +86,7 @@ fn fmt_node(f: &mut impl std::fmt::Write, node: &Node, src: &str) -> std::fmt::R
         }
         VariantWithPayload => {
             let (label, payload) = node.as_variant(src)?;
-            if Keyword::from_label(label).is_some() {
+            if Keyword::decode(label).is_some() {
                 f.write_char('%')?;
             }
             fmt_variant(f, label, payload, src)

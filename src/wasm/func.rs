@@ -1,8 +1,6 @@
-//! Web Assembly Value Encoding func encodings.
-
 use std::borrow::Cow;
 
-use crate::WasmType;
+use crate::wasm::WasmType;
 
 /// The WasmFunc trait may be implemented to represent Wasm func type
 /// signatures to be (de)serialized with WAVE.

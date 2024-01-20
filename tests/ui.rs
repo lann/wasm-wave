@@ -7,11 +7,9 @@ use std::{
 
 use snapbox::harness::{Case, Harness};
 use wasm_wave::{
-    fmt::DisplayValue,
-    func::WasmFunc,
-    parser::ParserError,
+    parser::{Parser, ParserError},
     value::{resolve_wit_func_type, FuncType, Value},
-    Parser,
+    wasm::{DisplayValue, WasmFunc},
 };
 use wit_parser::{Resolve, UnresolvedPackage};
 

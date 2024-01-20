@@ -1,10 +1,10 @@
-//! Wave lexer
+//! Lexing types
 
 use std::fmt::Display;
 
 use logos::{Lexer, Logos, Span};
 
-/// Represents a WAVE token.
+/// A [`logos::Logos`] implementation that represents a WAVE token.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Logos)]
 #[logos(error = LexingError)]
 #[logos(skip r"[ \t\n\r]+")]
@@ -47,7 +47,7 @@ pub enum Token {
 
     /// A label.
     #[regex(r"%?(?&label_word)(-(?&label_word))*")]
-    Label,
+    LabelOrKeyword,
 
     /// A char literal.
     #[regex(r#"'([^\\']{1,4}|(?&char_escape))'"#, validate_char)]
@@ -85,7 +85,7 @@ pub(crate) enum Keyword {
 }
 
 impl Keyword {
-    pub fn from_label(raw_label: &str) -> Option<Self> {
+    pub fn decode(raw_label: &str) -> Option<Self> {
         Some(match raw_label {
             "true" => Self::True,
             "false" => Self::False,

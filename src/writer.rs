@@ -1,4 +1,4 @@
-//! Web Assembly Value Encoding writer.
+//! WAVE writer
 
 use std::{fmt::Debug, io::Write};
 
@@ -6,8 +6,7 @@ use thiserror::Error;
 
 use crate::{
     lex::Keyword,
-    ty::{WasmType, WasmTypeKind},
-    val::WasmValue,
+    wasm::{WasmType, WasmTypeKind, WasmValue},
 };
 
 /// A Web Assembly Value Encoding writer.
@@ -30,18 +29,16 @@ impl<W: Write> Writer<W> {
     {
         let ty = val.ty();
         match ty.kind() {
-            crate::ty::WasmTypeKind::Bool => {
-                self.write_str(if val.unwrap_bool() { "true" } else { "false" })
-            }
-            crate::ty::WasmTypeKind::S8 => self.write_display(val.unwrap_s8()),
-            crate::ty::WasmTypeKind::S16 => self.write_display(val.unwrap_s16()),
-            crate::ty::WasmTypeKind::S32 => self.write_display(val.unwrap_s32()),
-            crate::ty::WasmTypeKind::S64 => self.write_display(val.unwrap_s64()),
-            crate::ty::WasmTypeKind::U8 => self.write_display(val.unwrap_u8()),
-            crate::ty::WasmTypeKind::U16 => self.write_display(val.unwrap_u16()),
-            crate::ty::WasmTypeKind::U32 => self.write_display(val.unwrap_u32()),
-            crate::ty::WasmTypeKind::U64 => self.write_display(val.unwrap_u64()),
-            crate::ty::WasmTypeKind::Float32 => {
+            WasmTypeKind::Bool => self.write_str(if val.unwrap_bool() { "true" } else { "false" }),
+            WasmTypeKind::S8 => self.write_display(val.unwrap_s8()),
+            WasmTypeKind::S16 => self.write_display(val.unwrap_s16()),
+            WasmTypeKind::S32 => self.write_display(val.unwrap_s32()),
+            WasmTypeKind::S64 => self.write_display(val.unwrap_s64()),
+            WasmTypeKind::U8 => self.write_display(val.unwrap_u8()),
+            WasmTypeKind::U16 => self.write_display(val.unwrap_u16()),
+            WasmTypeKind::U32 => self.write_display(val.unwrap_u32()),
+            WasmTypeKind::U64 => self.write_display(val.unwrap_u64()),
+            WasmTypeKind::Float32 => {
                 let f = val.unwrap_float32();
                 if f.is_nan() {
                     self.write_str("nan") // Display is "NaN"
@@ -49,7 +46,7 @@ impl<W: Write> Writer<W> {
                     self.write_display(f)
                 }
             }
-            crate::ty::WasmTypeKind::Float64 => {
+            WasmTypeKind::Float64 => {
                 let f = val.unwrap_float64();
                 if f.is_nan() {
                     self.write_str("nan") // Display is "NaN"
@@ -57,19 +54,19 @@ impl<W: Write> Writer<W> {
                     self.write_display(f)
                 }
             }
-            crate::ty::WasmTypeKind::Char => {
+            WasmTypeKind::Char => {
                 self.write_str("'")?;
                 self.write_char(val.unwrap_char())?;
                 self.write_str("'")
             }
-            crate::ty::WasmTypeKind::String => {
+            WasmTypeKind::String => {
                 self.write_str("\"")?;
                 for ch in val.unwrap_string().chars() {
                     self.write_char(ch)?;
                 }
                 self.write_str("\"")
             }
-            crate::ty::WasmTypeKind::List => {
+            WasmTypeKind::List => {
                 self.write_str("[")?;
                 for (idx, val) in val.unwrap_list().enumerate() {
                     if idx != 0 {
@@ -79,7 +76,7 @@ impl<W: Write> Writer<W> {
                 }
                 self.write_str("]")
             }
-            crate::ty::WasmTypeKind::Record => {
+            WasmTypeKind::Record => {
                 self.write_str("{")?;
                 let mut first = true;
                 for (name, val) in val.unwrap_record() {
@@ -101,7 +98,7 @@ impl<W: Write> Writer<W> {
                 }
                 self.write_str("}")
             }
-            crate::ty::WasmTypeKind::Tuple => {
+            WasmTypeKind::Tuple => {
                 self.write_str("(")?;
                 for (idx, val) in val.unwrap_tuple().enumerate() {
                     if idx != 0 {
@@ -111,9 +108,9 @@ impl<W: Write> Writer<W> {
                 }
                 self.write_str(")")
             }
-            crate::ty::WasmTypeKind::Variant => {
+            WasmTypeKind::Variant => {
                 let (name, val) = val.unwrap_variant();
-                if Keyword::from_label(&name).is_some() {
+                if Keyword::decode(&name).is_some() {
                     self.write_char('%')?;
                 }
                 self.write_str(name)?;
@@ -124,14 +121,14 @@ impl<W: Write> Writer<W> {
                 }
                 Ok(())
             }
-            crate::ty::WasmTypeKind::Enum => {
+            WasmTypeKind::Enum => {
                 let case = val.unwrap_enum();
-                if Keyword::from_label(&case).is_some() {
+                if Keyword::decode(&case).is_some() {
                     self.write_char('%')?;
                 }
                 self.write_str(case)
             }
-            crate::ty::WasmTypeKind::Option => match val.unwrap_option() {
+            WasmTypeKind::Option => match val.unwrap_option() {
                 Some(val) => {
                     self.write_str("some(")?;
                     self.write_value(&*val)?;
@@ -139,7 +136,7 @@ impl<W: Write> Writer<W> {
                 }
                 None => self.write_str("none"),
             },
-            crate::ty::WasmTypeKind::Result => {
+            WasmTypeKind::Result => {
                 let (name, val) = match val.unwrap_result() {
                     Ok(val) => ("ok", val),
                     Err(val) => ("err", val),
@@ -152,7 +149,7 @@ impl<W: Write> Writer<W> {
                 }
                 Ok(())
             }
-            crate::ty::WasmTypeKind::Flags => {
+            WasmTypeKind::Flags => {
                 self.write_str("{")?;
                 for (idx, name) in val.unwrap_flags().enumerate() {
                     if idx != 0 {
@@ -163,7 +160,7 @@ impl<W: Write> Writer<W> {
                 self.write_str("}")?;
                 Ok(())
             }
-            crate::ty::WasmTypeKind::Unsupported => panic!("unsupported value type"),
+            WasmTypeKind::Unsupported => panic!("unsupported value type"),
         }
     }
 

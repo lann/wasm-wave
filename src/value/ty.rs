@@ -1,9 +1,6 @@
 use std::{borrow::Cow, sync::Arc};
 
-use crate::{
-    ty::{maybe_unwrap, WasmTypeKind},
-    WasmType,
-};
+use crate::wasm::{maybe_unwrap_type, WasmType, WasmTypeKind};
 
 /// The [`WasmType`] of a [`Value`](super::Value).
 #[derive(Clone, Debug, PartialEq)]
@@ -203,7 +200,7 @@ impl WasmType for Type {
     }
 
     fn list_element_type(&self) -> Option<Self> {
-        let list = maybe_unwrap!(&self.0, TypeEnum::List)?;
+        let list = maybe_unwrap_type!(&self.0, TypeEnum::List)?;
         Some(list.element.clone())
     }
 
@@ -246,12 +243,12 @@ impl WasmType for Type {
     }
 
     fn option_some_type(&self) -> Option<Self> {
-        let option = maybe_unwrap!(&self.0, TypeEnum::Option)?;
+        let option = maybe_unwrap_type!(&self.0, TypeEnum::Option)?;
         Some(option.some.clone())
     }
 
     fn result_types(&self) -> Option<(Option<Self>, Option<Self>)> {
-        let result = maybe_unwrap!(&self.0, TypeEnum::Result)?;
+        let result = maybe_unwrap_type!(&self.0, TypeEnum::Result)?;
         Some((result.ok.clone(), result.err.clone()))
     }
 
@@ -265,6 +262,6 @@ impl WasmType for Type {
 
 impl std::fmt::Display for Type {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        crate::fmt::DisplayType(self).fmt(f)
+        crate::wasm::DisplayType(self).fmt(f)
     }
 }

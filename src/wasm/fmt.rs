@@ -1,8 +1,10 @@
-//! Display formatting types.
-
 use std::fmt::Display;
 
-use crate::{func::WasmFunc, ty::WasmTypeKind, writer::Writer, WasmType, WasmValue};
+use crate::{
+    wasm::{WasmFunc, WasmType, WasmTypeKind},
+    writer::Writer,
+    WasmValue,
+};
 
 /// Implements a WAVE-formatted [`Display`] for a [`WasmType`].
 pub struct DisplayType<'a, T: WasmType>(pub &'a T);

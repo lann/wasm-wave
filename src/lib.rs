@@ -4,26 +4,19 @@
 #![deny(missing_docs)]
 
 pub mod ast;
-pub mod fmt;
-pub mod func;
 pub mod lex;
 pub mod parser;
+pub mod untyped;
 pub mod value;
 pub mod writer;
 
-mod ty;
-mod untyped;
-mod val;
-
+pub mod wasm;
 #[cfg(feature = "wasmtime")]
 /// Implementations for [`wasmtime`] types.
 pub mod wasmtime;
 
-pub use ty::{WasmType, WasmTypeKind};
-pub use untyped::UntypedValue;
-pub use val::WasmValue;
-
-pub use parser::Parser;
+use parser::Parser;
+use wasm::WasmValue;
 use writer::Writer;
 
 /// Parses a [`WasmValue`] from the given WAVE-encoded string.
@@ -46,7 +39,7 @@ pub fn from_str<V: WasmValue>(ty: &V::Type, s: &str) -> Result<V, parser::Parser
     Ok(value)
 }
 
-/// WAVE-encodes a [`WasmValue`] into a string.
+/// Returns the given [`WasmValue`] as a WAVE-encoded string.
 /// ```
 /// use wasmtime::component::Val;
 /// # fn main() -> Result<(), wasm_wave::writer::WriterError> {

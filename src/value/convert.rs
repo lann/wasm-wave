@@ -1,4 +1,8 @@
-use crate::{ty::WasmTypeKind, value::ValueEnum, WasmType, WasmValue};
+use crate::{
+    value::ValueEnum,
+    wasm::{WasmType, WasmTypeKind},
+    WasmValue,
+};
 
 use super::{Type, Value};
 

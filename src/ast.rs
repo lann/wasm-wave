@@ -1,4 +1,4 @@
-//! Abstract syntax tree types.
+//! Abstract syntax tree types
 
 use std::{
     borrow::Cow,
@@ -9,7 +9,7 @@ use std::{
 
 use crate::{
     parser::{ParserError, ParserErrorKind, Span},
-    WasmType, WasmTypeKind, WasmValue,
+    wasm::{WasmType, WasmTypeKind, WasmValue},
 };
 use itertools::{EitherOrBoth, Itertools};
 

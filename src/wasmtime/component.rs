@@ -4,11 +4,11 @@ use wasmtime::component;
 
 use crate::{
     canonicalize_nan32, canonicalize_nan64,
-    fmt::DisplayFunc,
-    func::WasmFunc,
-    ty::{maybe_unwrap, WasmTypeKind},
-    val::{unwrap_val, WasmValueError, ensure_type_kind},
-    WasmType, WasmValue,
+    wasm::{
+        ensure_type_kind, maybe_unwrap_type, unwrap_val, DisplayFunc, WasmFunc, WasmType,
+        WasmTypeKind, WasmValueError,
+    },
+    WasmValue,
 };
 
 impl WasmType for component::Type {
@@ -41,7 +41,7 @@ impl WasmType for component::Type {
     }
 
     fn list_element_type(&self) -> Option<Self> {
-        Some(maybe_unwrap!(self, Self::List)?.ty())
+        Some(maybe_unwrap_type!(self, Self::List)?.ty())
     }
 
     fn record_fields(&self) -> Box<dyn Iterator<Item = (Cow<str>, Self)> + '_> {
@@ -73,11 +73,11 @@ impl WasmType for component::Type {
     }
 
     fn option_some_type(&self) -> Option<Self> {
-        maybe_unwrap!(self, Self::Option).map(|o| o.ty())
+        maybe_unwrap_type!(self, Self::Option).map(|o| o.ty())
     }
 
     fn result_types(&self) -> Option<(Option<Self>, Option<Self>)> {
-        let result = maybe_unwrap!(self, Self::Result)?;
+        let result = maybe_unwrap_type!(self, Self::Result)?;
         Some((result.ok(), result.err()))
     }
 

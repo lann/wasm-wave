@@ -2,10 +2,8 @@ use std::borrow::Cow;
 
 use crate::{
     canonicalize_nan32, canonicalize_nan64,
-    func::WasmFunc,
-    ty::WasmTypeKind,
-    val::{unwrap_val, WasmValueError},
-    WasmType, WasmValue,
+    wasm::{unwrap_val, WasmFunc, WasmType, WasmTypeKind, WasmValueError},
+    WasmValue,
 };
 
 impl WasmType for wasmtime::ValType {

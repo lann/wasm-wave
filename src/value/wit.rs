@@ -2,7 +2,7 @@ use wit_parser::{
     Enum, Flags, Function, Record, Resolve, Result_, Tuple, Type, TypeDefKind, TypeId, Variant,
 };
 
-use crate::{val::WasmValueError, value};
+use crate::{value, wasm::WasmValueError};
 
 /// Resolves a [`value::Type`] from the given [`wit_parser::Resolve`] and [`TypeId`].
 /// # Panics

@@ -7,7 +7,7 @@
 
 use std::{f32, f64};
 
-use wasm_wave::WasmValue;
+use wasm_wave::wasm::WasmValue;
 
 #[test]
 fn nan() {

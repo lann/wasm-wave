@@ -1,4 +1,4 @@
-//! Web Assembly Value Encoding parser.
+//! Parsing types
 
 use std::{collections::HashSet, error::Error, fmt::Display};
 
@@ -8,7 +8,8 @@ use logos::{Lexer, Logos};
 use crate::{
     ast::{Node, NodeType},
     lex::{Keyword, LexingError, Token},
-    UntypedValue, WasmValue,
+    untyped::UntypedValue,
+    WasmValue,
 };
 
 pub use logos::Span;
@@ -35,7 +36,7 @@ impl<'source> Parser<'source> {
         }
     }
 
-    /// Parses a WAVE-encoded value of the given [`crate::WasmType`] into a
+    /// Parses a WAVE-encoded value of the given [`crate::wasm::WasmType`] into a
     /// corresponding [`WasmValue`].
     pub fn parse_value<V: WasmValue>(&mut self, ty: &V::Type) -> Result<V, ParserError> {
         let node = self.parse_node()?;
@@ -66,7 +67,7 @@ impl<'source> Parser<'source> {
         &mut self,
     ) -> Result<(&'source str, UntypedValue<'source>), ParserError> {
         self.advance()?;
-        self.expect_token(Token::Label)?;
+        self.expect_token(Token::LabelOrKeyword)?;
         let func_name = self.slice();
         self.advance()?;
         self.expect_token(Token::ParenOpen)?;
@@ -97,7 +98,7 @@ impl<'source> Parser<'source> {
             Token::ParenOpen => self.parse_tuple()?,
             Token::BracketOpen => self.parse_list()?,
             Token::BraceOpen => self.parse_record_or_flags()?,
-            Token::Label => match Keyword::from_label(self.slice()) {
+            Token::LabelOrKeyword => match Keyword::decode(self.slice()) {
                 Some(Keyword::True) => self.leaf_node(NodeType::BoolTrue),
                 Some(Keyword::False) => self.leaf_node(NodeType::BoolFalse),
                 Some(Keyword::Some) => self.parse_option(NodeType::OptionSome)?,
@@ -266,7 +267,7 @@ impl<'source> Parser<'source> {
     }
 
     fn parse_label(&mut self) -> Result<Node, ParserError> {
-        self.expect_token(Token::Label)?;
+        self.expect_token(Token::LabelOrKeyword)?;
         Ok(self.leaf_node(NodeType::Label))
     }
 

@@ -14,16 +14,21 @@ pub use wit::{resolve_wit_func_type, resolve_wit_type};
 
 use std::{borrow::Cow, collections::HashMap, sync::Arc};
 
+use crate::{
+    canonicalize_nan32, canonicalize_nan64,
+    wasm::{
+        ensure_type_kind, maybe_unwrap_type, unwrap_val, WasmType, WasmTypeKind, WasmValue,
+        WasmValueError,
+    },
+};
+
 use self::ty::{
     EnumType, FlagsType, ListType, OptionType, RecordType, ResultType, TupleType, TypeEnum,
     VariantType,
 };
-use crate::val::{ensure_type_kind, WasmValueError};
-use crate::{canonicalize_nan32, canonicalize_nan64, WasmTypeKind};
-use crate::{ty::maybe_unwrap, val::unwrap_val, WasmType, WasmValue};
 
-pub use func::FuncType;
-pub use ty::Type;
+pub use self::func::FuncType;
+pub use self::ty::Type;
 
 /// A Value is a WAVE value, and implements [`WasmValue`].
 #[derive(Debug, Clone, PartialEq)]
@@ -192,7 +197,7 @@ impl WasmValue for Value {
             .into_iter()
             .map(|v| check_type(&element_type, v))
             .collect::<Result<_, _>>()?;
-        let ty = maybe_unwrap!(&ty.0, TypeEnum::List).unwrap().clone();
+        let ty = maybe_unwrap_type!(&ty.0, TypeEnum::List).unwrap().clone();
         Ok(Self(ValueEnum::List(List { ty, elements })))
     }
 
@@ -212,7 +217,7 @@ impl WasmValue for Value {
         if let Some(unknown) = field_vals.into_keys().next() {
             return Err(WasmValueError::UnknownField(unknown.into()));
         }
-        let ty = maybe_unwrap!(&ty.0, TypeEnum::Record).unwrap().clone();
+        let ty = maybe_unwrap_type!(&ty.0, TypeEnum::Record).unwrap().clone();
         Ok(Self(ValueEnum::Record(Record { ty, fields })))
     }
 
@@ -234,7 +239,7 @@ impl WasmValue for Value {
                 return Err(WasmValueError::wrong_value_type(&val.ty(), val));
             }
         }
-        let ty = maybe_unwrap!(&ty.0, TypeEnum::Tuple).unwrap().clone();
+        let ty = maybe_unwrap_type!(&ty.0, TypeEnum::Tuple).unwrap().clone();
         Ok(Self(ValueEnum::Tuple(Tuple { ty, elements })))
     }
 
@@ -250,7 +255,9 @@ impl WasmValue for Value {
             .find_map(|(idx, (name, ty))| (name == case_name).then_some((idx, ty)))
             .ok_or_else(|| WasmValueError::UnknownCase(case_name.into()))?;
         let payload = check_payload_type(case_name, &payload_type, val)?;
-        let ty = maybe_unwrap!(&ty.0, TypeEnum::Variant).unwrap().clone();
+        let ty = maybe_unwrap_type!(&ty.0, TypeEnum::Variant)
+            .unwrap()
+            .clone();
         Ok(Self(ValueEnum::Variant(Variant { ty, case, payload })))
     }
 
@@ -260,7 +267,7 @@ impl WasmValue for Value {
             .enum_cases()
             .position(|name| name == case)
             .ok_or_else(|| WasmValueError::UnknownCase(case.into()))?;
-        let ty = maybe_unwrap!(&ty.0, TypeEnum::Enum).unwrap().clone();
+        let ty = maybe_unwrap_type!(&ty.0, TypeEnum::Enum).unwrap().clone();
         Ok(Self(ValueEnum::Enum(Enum { ty, case })))
     }
 
@@ -270,7 +277,7 @@ impl WasmValue for Value {
             Some(val) => Some(Box::new(check_type(&ty.option_some_type().unwrap(), val)?)),
             None => None,
         };
-        let ty = maybe_unwrap!(&ty.0, TypeEnum::Option).unwrap().clone();
+        let ty = maybe_unwrap_type!(&ty.0, TypeEnum::Option).unwrap().clone();
         Ok(Self(ValueEnum::Option(OptionValue { ty, value })))
     }
 
@@ -284,7 +291,7 @@ impl WasmValue for Value {
             Ok(ok) => Ok(check_payload_type("ok", &ok_type, ok)?),
             Err(err) => Err(check_payload_type("err", &err_type, err)?),
         };
-        let ty = maybe_unwrap!(&ty.0, TypeEnum::Result).unwrap().clone();
+        let ty = maybe_unwrap_type!(&ty.0, TypeEnum::Result).unwrap().clone();
         Ok(Self(ValueEnum::Result(ResultValue { ty, value })))
     }
 
@@ -306,7 +313,7 @@ impl WasmValue for Value {
         // Flags values don't logically contain an ordering of the flags. Sort
         // the flags values so that equivalent flags values compare equal.
         flags.sort();
-        let ty = maybe_unwrap!(&ty.0, TypeEnum::Flags).unwrap().clone();
+        let ty = maybe_unwrap_type!(&ty.0, TypeEnum::Flags).unwrap().clone();
         Ok(Self(ValueEnum::Flags(Flags { ty, flags })))
     }
 
