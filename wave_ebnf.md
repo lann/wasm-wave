@@ -18,7 +18,7 @@ value ::= number
         | record
 
 value-ws ::= ws value ws
-ws ::= [ \t\r\n\f]*
+ws ::= [ \t\n\r]*
 
 number ::= number_finite
          | 'nan'

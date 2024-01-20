@@ -8,7 +8,7 @@ use logos::{Lexer, Logos};
 use crate::{
     ast::{Node, NodeType},
     lex::{Keyword, LexingError, Token},
-    UntypedValue, WasmTypeKind, WasmValue,
+    UntypedValue, WasmValue,
 };
 
 pub use logos::Span;

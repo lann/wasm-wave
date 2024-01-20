@@ -7,7 +7,7 @@ use logos::{Lexer, Logos, Span};
 /// Represents a WAVE token.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Logos)]
 #[logos(error = LexingError)]
-#[logos(skip r"[ \t\r\n\f]+")]
+#[logos(skip r"[ \t\n\r]+")]
 #[logos(subpattern label_word = r"[a-z][a-z0-9]*|[A-Z][A-Z0-9]*")]
 #[logos(subpattern char_escape = r#"\\['"tnr\\]|\\u\{[0-9a-fA-F]{1,6}\}"#)]
 pub enum Token {
