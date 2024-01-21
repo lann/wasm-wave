@@ -29,7 +29,8 @@ fn test(path: &Path) -> Result<String, Box<dyn std::error::Error>> {
     let inputs = std::fs::read_to_string(path)?;
     let mut output = String::new();
     let out = &mut output;
-    for mut input in inputs.trim_end_matches(';').split(";\n") {
+    let inputs = inputs.trim_end().trim_end_matches(';');
+    for mut input in inputs.split(";\n") {
         // Copy leading comments into the output
         while input.starts_with("//") {
             let Some((comment, remainder)) = input.split_once('\n') else {
@@ -39,7 +40,7 @@ fn test(path: &Path) -> Result<String, Box<dyn std::error::Error>> {
             writeln!(out, "{comment}")?;
             continue;
         }
-        
+
         fn parse_func_call(
             input: &str,
         ) -> Result<(String, &'static FuncType, Vec<Value>), ParserError> {

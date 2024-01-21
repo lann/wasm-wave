@@ -11,6 +11,7 @@ pub type Lexer<'source> = logos::Lexer<'source, Token>;
 #[derive(Clone, Copy, Debug, PartialEq, Eq, logos::Logos)]
 #[logos(error = Option<Span>)]
 #[logos(skip r"[ \t\n\r]+")]
+#[logos(skip r"//[^\n]*")]
 #[logos(subpattern label_word = r"[a-z][a-z0-9]*|[A-Z][A-Z0-9]*")]
 #[logos(subpattern char_escape = r#"\\['"tnr\\]|\\u\{[0-9a-fA-F]{1,6}\}"#)]
 pub enum Token {
