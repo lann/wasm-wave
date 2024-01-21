@@ -1,5 +1,5 @@
-string("")
-string("WAVE🌊")
-string("\\\'\"\t\n\r")
-string("'\'\u{27}")
-string("☃\u{2603}\u{002603}")
+string("");
+string("WAVE🌊");
+string("\\\'\"\t\n\r");
+string("'\'\u{27}");
+string("☃\u{2603}\u{002603}");

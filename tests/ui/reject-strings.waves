@@ -1,13 +1,13 @@
 // Reject surrogates.
-string("\u{d800}")
-string("\u{dbff}")
-string("\u{dc00}")
-string("\u{dcff}")
-string("\u{d800}\\u{dc00}")
+string("\u{d800}");
+string("\u{dbff}");
+string("\u{dc00}");
+string("\u{dcff}");
+string("\u{d800}\\u{dc00}");
 // Reject invalid values.
-string("\u{110000}")
-string("\u{ffffffff}")
-string("\u{80000000}")
+string("\u{110000}");
+string("\u{ffffffff}");
+string("\u{80000000}");
 // Reject invalid syntax.
-string("\u{-1}")
-string("\u{+1}")
+string("\u{-1}");
+string("\u{+1}");

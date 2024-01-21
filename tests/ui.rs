@@ -26,15 +26,34 @@ fn setup(path: PathBuf) -> Case {
 
 fn test(path: &Path) -> Result<String, Box<dyn std::error::Error>> {
     let filename = path.file_name().unwrap().to_string_lossy();
-    let input = std::fs::read_to_string(path)?;
+    let inputs = std::fs::read_to_string(path)?;
     let mut output = String::new();
     let out = &mut output;
-    for line in input.lines() {
-        if line.starts_with("//") {
-            writeln!(out, "{line}")?;
+    for mut input in inputs.trim_end_matches(';').split(";\n") {
+        // Copy leading comments into the output
+        while input.starts_with("//") {
+            let Some((comment, remainder)) = input.split_once('\n') else {
+                break;
+            };
+            input = remainder;
+            writeln!(out, "{comment}")?;
             continue;
         }
-        match parse_func_call(line) {
+        
+        fn parse_func_call(
+            input: &str,
+        ) -> Result<(String, &'static FuncType, Vec<Value>), ParserError> {
+            let untyped_call = UntypedFuncCall::parse(input)?;
+            let func_name = untyped_call.name().to_string();
+            let func_type = get_func_type(&func_name).unwrap_or_else(|| {
+                panic!("unknown test func {func_name:?}");
+            });
+            let param_types = func_type.params().collect::<Vec<_>>();
+            let values = untyped_call.to_wasm_params::<Value>(&param_types)?;
+            Ok((func_name, func_type, values))
+        }
+
+        match parse_func_call(input) {
             Ok((func_name, func_type, values)) => {
                 assert!(
                     !filename.starts_with("reject-"),
@@ -62,17 +81,6 @@ fn test(path: &Path) -> Result<String, Box<dyn std::error::Error>> {
         }
     }
     Ok(output)
-}
-
-fn parse_func_call(input: &str) -> Result<(String, &'static FuncType, Vec<Value>), ParserError> {
-    let untyped_call = UntypedFuncCall::parse(input)?;
-    let func_name = untyped_call.name().to_string();
-    let func_type = get_func_type(&func_name).unwrap_or_else(|| {
-        panic!("unknown test func {func_name:?}");
-    });
-    let param_types = func_type.params().collect::<Vec<_>>();
-    let values = untyped_call.to_wasm_params::<Value>(&param_types)?;
-    Ok((func_name, func_type, values))
 }
 
 fn get_func_type(func_name: &str) -> Option<&'static FuncType> {
