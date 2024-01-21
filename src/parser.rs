@@ -7,7 +7,7 @@ use indexmap::IndexMap;
 use crate::{
     ast::{Node, NodeType},
     lex::{Keyword, Lexer, Span, Token},
-    untyped::UntypedValue,
+    untyped::{UntypedFuncCall, UntypedValue},
     WasmValue,
 };
 
@@ -47,29 +47,14 @@ impl<'source> Parser<'source> {
     }
 
     /// Parses a function name followed by a WAVE-encoded, parenthesized,
-    /// comma-separated sequence of values of the given `types`. Any number
-    /// of option-typed values at the end of the sequence may be omitted from
-    /// the input; those will be returned as `none` values.
-    pub fn parse_func_call<'types, V: WasmValue + 'static>(
-        &mut self,
-        types: impl IntoIterator<Item = &'types V::Type>,
-    ) -> Result<(&'source str, Vec<V>), ParserError> {
-        let (func_name, args) = self.parse_raw_func_call()?;
-        let values = args.node().to_wasm_params(types, args.source())?;
-        Ok((func_name, values))
-    }
-
-    /// Parses a function name followed by a WAVE-encoded tuple.
-    pub fn parse_raw_func_call(
-        &mut self,
-    ) -> Result<(&'source str, UntypedValue<'source>), ParserError> {
+    /// comma-separated sequence of values into an [`UntypedFuncCall`].
+    pub fn parse_raw_func_call(&mut self) -> Result<UntypedFuncCall<'source>, ParserError> {
         self.advance()?;
-        self.expect_token(Token::LabelOrKeyword)?;
-        let func_name = self.slice();
+        let name = self.parse_label()?;
         self.advance()?;
         self.expect_token(Token::ParenOpen)?;
-        let args = self.parse_tuple()?;
-        Ok((func_name, UntypedValue::new(self.lex.source(), args)))
+        let params = self.parse_tuple()?;
+        Ok(UntypedFuncCall::new(self.lex.source(), name, params))
     }
 
     /// Returns an error if any significant input remains unparsed.

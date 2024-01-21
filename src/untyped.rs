@@ -4,7 +4,7 @@ use std::borrow::Cow;
 
 use crate::{ast::Node, lex::Keyword, parser::ParserError, Parser, WasmValue};
 
-/// An UntypedValue represents a parsed but not type-checked WAVE value.
+/// An UntypedValue is a parsed but not type-checked WAVE value.
 #[derive(Debug)]
 pub struct UntypedValue<'source> {
     source: Cow<'source, str>,
@@ -19,7 +19,7 @@ impl<'source> UntypedValue<'source> {
         }
     }
 
-    /// Parse an untyped value from WAVE.
+    /// Parses an untyped value from WAVE.
     pub fn parse(source: &'source str) -> Result<Self, ParserError> {
         let mut parser = Parser::new(source);
         let val = parser.parse_raw_value()?;
@@ -32,20 +32,6 @@ impl<'source> UntypedValue<'source> {
         UntypedValue::new(self.source.into_owned(), self.node)
     }
 
-    /// Converts this untyped value into the given typed value.
-    pub fn to_wasm_value<V: WasmValue>(&self, ty: &V::Type) -> Result<V, ParserError> {
-        self.node.to_wasm_value(ty, &self.source)
-    }
-
-    /// Converts this untyped tuple value into the given parameter types.
-    /// See [`Parser::parse_func_call`].
-    pub fn to_wasm_params<'types, V: WasmValue + 'static>(
-        &self,
-        types: impl IntoIterator<Item = &'types V::Type>,
-    ) -> Result<Vec<V>, ParserError> {
-        self.node().to_wasm_params(types, self.source())
-    }
-
     /// Returns the source this value was parsed from.
     pub fn source(&self) -> &str {
         &self.source
@@ -55,11 +41,90 @@ impl<'source> UntypedValue<'source> {
     pub fn node(&self) -> &Node {
         &self.node
     }
+
+    /// Converts this untyped value into the given typed value.
+    pub fn to_wasm_value<V: WasmValue>(&self, ty: &V::Type) -> Result<V, ParserError> {
+        self.node.to_wasm_value(ty, &self.source)
+    }
 }
 
 impl std::fmt::Display for UntypedValue<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         fmt_node(f, &self.node, &self.source)
+    }
+}
+
+/// An UntypedFuncCall is a parsed but not type-checked WAVE function call.
+///
+/// WAVE function calls have the form `<name>(<params...>)`.
+pub struct UntypedFuncCall<'source> {
+    source: Cow<'source, str>,
+    name: Node,
+    params: Node,
+}
+
+impl<'source> UntypedFuncCall<'source> {
+    pub(crate) fn new(source: impl Into<Cow<'source, str>>, name: Node, params: Node) -> Self {
+        Self {
+            source: source.into(),
+            name,
+            params,
+        }
+    }
+
+    /// Parses an untyped function call from WAVE.
+    pub fn parse(source: &'source str) -> Result<Self, ParserError> {
+        let mut parser = Parser::new(source);
+        let call = parser.parse_raw_func_call()?;
+        parser.finish()?;
+        Ok(call)
+    }
+
+    /// Creates an owned function call, copying the entire source string if necessary.
+    pub fn into_owned(self) -> UntypedFuncCall<'static> {
+        UntypedFuncCall::new(
+            self.source.into_owned(),
+            self.name.clone(),
+            self.params.clone(),
+        )
+    }
+
+    /// Returns the source this function call was parsed from.
+    pub fn source(&self) -> &str {
+        &self.source
+    }
+
+    /// Returns the function name node.
+    pub fn name_node(&self) -> &Node {
+        &self.name
+    }
+
+    /// Returns the function parameters node.
+    pub fn params_node(&self) -> &Node {
+        &self.params
+    }
+
+    /// Returns the function name.
+    pub fn name(&self) -> &str {
+        self.name.slice(&self.source)
+    }
+
+    /// Converts the untyped parameters into the given types.
+    ///
+    /// Any number of trailing option-typed values may be omitted; those will
+    /// be returned as `none` values.
+    pub fn to_wasm_params<'types, V: WasmValue + 'static>(
+        &self,
+        types: impl IntoIterator<Item = &'types V::Type>,
+    ) -> Result<Vec<V>, ParserError> {
+        self.params.to_wasm_params(types, self.source())
+    }
+}
+
+impl std::fmt::Display for UntypedFuncCall<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.name.slice(&self.source))?;
+        fmt_node(f, &self.params, &self.source)
     }
 }
 

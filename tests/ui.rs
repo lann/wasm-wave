@@ -7,7 +7,8 @@ use std::{
 
 use snapbox::harness::{Case, Harness};
 use wasm_wave::{
-    parser::{Parser, ParserError},
+    parser::ParserError,
+    untyped::UntypedFuncCall,
     value::{resolve_wit_func_type, FuncType, Value},
     wasm::{DisplayValue, WasmFunc},
 };
@@ -63,13 +64,14 @@ fn test(path: &Path) -> Result<String, Box<dyn std::error::Error>> {
     Ok(output)
 }
 
-fn parse_func_call(input: &str) -> Result<(&str, &'static FuncType, Vec<Value>), ParserError> {
-    let (func_name, args) = Parser::new(input).parse_raw_func_call()?;
-    let func_type = get_func_type(func_name).unwrap_or_else(|| {
+fn parse_func_call(input: &str) -> Result<(String, &'static FuncType, Vec<Value>), ParserError> {
+    let untyped_call = UntypedFuncCall::parse(input)?;
+    let func_name = untyped_call.name().to_string();
+    let func_type = get_func_type(&func_name).unwrap_or_else(|| {
         panic!("unknown test func {func_name:?}");
     });
     let param_types = func_type.params().collect::<Vec<_>>();
-    let values = args.to_wasm_params::<Value>(&param_types)?;
+    let values = untyped_call.to_wasm_params::<Value>(&param_types)?;
     Ok((func_name, func_type, values))
 }
 

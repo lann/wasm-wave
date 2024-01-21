@@ -210,7 +210,7 @@ impl Node {
     }
 
     /// Converts this node into the given types.
-    /// See [`crate::Parser::parse_func_call`].
+    /// See [`crate::untyped::UntypedFuncCall::to_wasm_params`].
     pub fn to_wasm_params<'types, V: WasmValue + 'static>(
         &self,
         types: impl IntoIterator<Item = &'types V::Type>,

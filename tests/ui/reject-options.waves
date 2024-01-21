@@ -2,7 +2,7 @@ option-u8(some)
 option-u8(some())
 option-u8(some(some))
 option-u8(some(some()))
-option-u8(some(some(0))),
+option-u8(some(some(0)))
 option-u8(some(some(some(0))))
 option-u8(none())
 option-u8(some(none()))
