@@ -5,7 +5,7 @@ use std::borrow::Cow;
 use crate::{ast::Node, lex::Keyword, parser::ParserError, Parser, WasmValue};
 
 /// An UntypedValue is a parsed but not type-checked WAVE value.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct UntypedValue<'source> {
     source: Cow<'source, str>,
     node: Node,
