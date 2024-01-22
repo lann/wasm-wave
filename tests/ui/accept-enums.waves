@@ -1,3 +1,5 @@
+hand-enum(left);
+hand-enum(%left);
 keyword-cases-enum(%true);
 keyword-cases-enum(%false);
 keyword-cases-enum(%some);

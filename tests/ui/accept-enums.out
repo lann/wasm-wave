@@ -1,3 +1,5 @@
+hand-enum(enm: left)
+hand-enum(enm: left)
 keyword-cases-enum(enm: %true)
 keyword-cases-enum(enm: %false)
 keyword-cases-enum(enm: %some)

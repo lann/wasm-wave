@@ -39,6 +39,12 @@ interface ui {
     }
     keyword-fields-record: func(rec: keyword-fields);
 
+    enum hand {
+        left,
+        right,
+    }
+    hand-enum: func(enm: hand);
+
     enum keyword-cases {
         true,
         false,
