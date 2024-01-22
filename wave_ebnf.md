@@ -18,7 +18,8 @@ value ::= number
         | record
 
 value-ws ::= ws value ws
-ws ::= [ \t\n\r]*
+ws ::= ([ \t\n\r]* comment?)*
+comment ::= '//' [^\n]*
 
 number ::= number_finite
          | 'nan'
@@ -43,24 +44,24 @@ common-char ::= <any Unicode Scalar Value except ['"\]>
 escape ::= ['"tnr\] | escape-unicode
 escape-unicode ::= 'u{' [0-9a-fA-F]+ '}'
 
-variant-case ::= label variant-case-payload?
+variant-case ::= label ws variant-case-payload?
 variant-case-payload ::= '(' value-ws ')'
 
-tuple ::= '(' values-seq ','? ')'
+tuple ::= '(' values-seq ','? ws ')'
 
 list ::= '[' ws ']'
-       | '[' values-seq ','? ']'
+       | '[' values-seq ','? ws ']'
 
 values-seq ::= value-ws
              | values ',' values-ws
 
 flags ::= '{' ws '}'
-        | '{' flags-seq ','? '}'
+        | '{' flags-seq ','? ws '}'
 flags-seq ::= ws label ws
             | flags-seq ',' label
 
-record ::= '{' ':' '}'
-         | '{' record-fields ','? '}'
+record ::= '{' ws ':' ws '}'
+         | '{' record-fields ','? ws '}'
 record-fields ::= ws record-field ws
                 | record-fields ',' record-field
 record-field ::= label ws ':' ws value

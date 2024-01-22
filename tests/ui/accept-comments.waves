@@ -5,7 +5,7 @@ basic-record(       // comment
       1             // comment
     ),              // comment
   }                 // comment
-);
+)                   // comment;
 basic-record(
   // comment
   {
