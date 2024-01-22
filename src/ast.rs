@@ -379,8 +379,8 @@ impl Node {
 }
 
 fn flattenable(kind: WasmTypeKind) -> bool {
-    use WasmTypeKind::*;
-    !matches!(kind, Option | Result)
+    // TODO: Consider wither to allow flattening an option in a result or vice-versa.
+    !matches!(kind, WasmTypeKind::Option | WasmTypeKind::Result)
 }
 
 fn unescape(chars: &mut Chars) -> Result<Option<char>, ()> {
