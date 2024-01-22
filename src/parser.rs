@@ -371,6 +371,11 @@ impl ParserError {
     pub fn span(&self) -> Span {
         self.span.clone()
     }
+
+    /// Returns the [`Option<&String>`] of this error.
+    pub fn detail(&self) -> Option<&String> {
+        self.detail.as_ref()
+    }
 }
 
 impl Display for ParserError {
