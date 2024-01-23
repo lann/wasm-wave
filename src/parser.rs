@@ -144,9 +144,9 @@ impl<'source> Parser<'source> {
             let field = self.slice().trim_start_matches('%');
             if !seen.insert(field) {
                 return Err(ParserError::with_detail(
-                    ParserErrorKind::InvalidValue,
+                    ParserErrorKind::DuplicateField,
                     label.span(),
-                    format!("duplicate field {field:?}"),
+                    format!("{field:?}"),
                 ));
             }
             // Parse colon
@@ -180,9 +180,9 @@ impl<'source> Parser<'source> {
             let flag = self.slice().trim_start_matches('%');
             if flags.insert(flag, label).is_some() {
                 return Err(ParserError::with_detail(
-                    ParserErrorKind::InvalidValue,
+                    ParserErrorKind::DuplicateFlag,
                     span,
-                    format!("duplicate flag {flag:?}"),
+                    format!("{flag:?}"),
                 ));
             }
             // Parse comma and/or end of flags
@@ -405,6 +405,8 @@ pub enum ParserErrorKind {
     TrailingCharacters,
     UnexpectedEnd,
     UnexpectedToken,
+    DuplicateField,
+    DuplicateFlag,
     WasmValueError,
 }
 
@@ -421,6 +423,8 @@ impl Display for ParserErrorKind {
             ParserErrorKind::TrailingCharacters => "trailing characters after value",
             ParserErrorKind::UnexpectedEnd => "unexpected end of input",
             ParserErrorKind::UnexpectedToken => "unexpected token",
+            ParserErrorKind::DuplicateField => "duplicate field",
+            ParserErrorKind::DuplicateFlag => "duplicate flag",
             ParserErrorKind::WasmValueError => "error converting Wasm value",
         };
         write!(f, "{msg}")
