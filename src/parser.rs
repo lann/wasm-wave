@@ -324,11 +324,12 @@ impl<'source> Parser<'source> {
 }
 
 /// A WAVE parsing error.
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct ParserError {
     kind: ParserErrorKind,
     span: Span,
     detail: Option<String>,
+    source: Option<Box<dyn Error + 'static>>,
 }
 
 impl ParserError {
@@ -337,6 +338,7 @@ impl ParserError {
             kind,
             span,
             detail: None,
+            source: None,
         }
     }
 
@@ -345,6 +347,20 @@ impl ParserError {
             kind,
             span,
             detail: Some(detail.to_string()),
+            source: None,
+        }
+    }
+
+    pub(crate) fn with_source(
+        kind: ParserErrorKind,
+        span: Span,
+        source: impl Into<Box<dyn Error>>,
+    ) -> Self {
+        Self {
+            kind,
+            span,
+            detail: None,
+            source: Some(source.into()),
         }
     }
 
@@ -366,7 +382,9 @@ impl ParserError {
 
 impl Display for ParserError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if let Some(detail) = &self.detail {
+        if let Some(source) = &self.source {
+            write!(f, "{}: {} at {:?}", self.kind, source, self.span)
+        } else if let Some(detail) = &self.detail {
             write!(f, "{}: {} at {:?}", self.kind, detail, self.span)
         } else {
             write!(f, "{} at {:?}", self.kind, self.span)
@@ -374,7 +392,11 @@ impl Display for ParserError {
     }
 }
 
-impl Error for ParserError {}
+impl Error for ParserError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        self.source.as_deref()
+    }
+}
 
 /// The kind of a WAVE parsing error.
 #[derive(Clone, Copy, Debug, PartialEq)]

@@ -1,6 +1,6 @@
 // Missing `required`.
-error converting Wasm value: missing record field "required" at 13..31
-error converting Wasm value: missing record field "required" at 13..34
+error converting Wasm value: missing field "required" at 13..31
+error converting Wasm value: missing field "required" at 13..34
 // Duplicate `required`.
 duplicate field: "required" at 28..36
 duplicate field: "required" at 28..36

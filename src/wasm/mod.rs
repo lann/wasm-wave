@@ -78,3 +78,5 @@ impl std::fmt::Display for WasmValueError {
         }
     }
 }
+
+impl std::error::Error for WasmValueError {}

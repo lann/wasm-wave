@@ -3,16 +3,14 @@
 use std::{
     borrow::Cow,
     collections::HashMap,
-    fmt::Display,
     str::{Chars, FromStr},
 };
 
 use crate::{
     lex::Span,
     parser::{ParserError, ParserErrorKind},
-    wasm::{WasmType, WasmTypeKind, WasmValue},
+    wasm::{WasmType, WasmTypeKind, WasmValue, WasmValueError},
 };
-use itertools::{EitherOrBoth, Itertools};
 
 /// A WAVE AST node.
 #[derive(Clone, Debug)]
@@ -205,7 +203,11 @@ impl Node {
             WasmTypeKind::Option => self.to_wasm_option(ty, src)?,
             WasmTypeKind::Result => self.to_wasm_result(ty, src)?,
             WasmTypeKind::Flags => self.to_wasm_flags(ty, src)?,
-            other => return Err(self.wasm_value_error(format!("unsupported wasm type {other:?}"))),
+            other => {
+                return Err(
+                    self.wasm_value_error(WasmValueError::UnsupportedType(other.to_string()))
+                )
+            }
         })
     }
 
@@ -265,7 +267,9 @@ impl Node {
                     (None, WasmTypeKind::Option) => V::make_option(field_type, None)
                         .map_err(|err| self.wasm_value_error(err))?,
                     _ => {
-                        return Err(self.wasm_value_error(format!("missing record field {name:?}")));
+                        return Err(
+                            self.wasm_value_error(WasmValueError::MissingField(name.to_string()))
+                        );
                     }
                 };
                 Ok((name.as_ref(), value))
@@ -275,16 +279,20 @@ impl Node {
     }
 
     fn to_wasm_tuple<V: WasmValue>(&self, ty: &V::Type, src: &str) -> Result<V, ParserError> {
+        let types = ty.tuple_element_types().collect::<Vec<_>>();
+        let values = self.as_tuple()?;
+        if types.len() != values.len() {
+            return Err(
+                self.wasm_value_error(WasmValueError::WrongNumberOfTupleValues {
+                    want: types.len(),
+                    got: values.len(),
+                }),
+            );
+        }
         let values = ty
             .tuple_element_types()
-            .zip_longest(self.as_tuple()?)
-            .map(|type_node| match type_node {
-                EitherOrBoth::Both(ty, node) => node.to_wasm_value(&ty, src),
-                EitherOrBoth::Left(_) => Err(self.wasm_value_error("not enough values for tuple")),
-                EitherOrBoth::Right(extra) => {
-                    Err(extra.wasm_value_error("too many values for tuple"))
-                }
-            })
+            .zip(self.as_tuple()?)
+            .map(|(ty, node)| node.to_wasm_value(&ty, src))
             .collect::<Result<Vec<_>, _>>()?;
         V::make_tuple(ty, values).map_err(|err| self.wasm_value_error(err))
     }
@@ -294,13 +302,8 @@ impl Node {
         let payload_type = ty
             .variant_cases()
             .find_map(|(case, payload)| (case == label).then_some(payload))
-            .ok_or_else(|| self.wasm_value_error(format!("unknown variant case {label:?}")))?;
-        let payload_value = match (payload_type, payload) {
-            (Some(ty), Some(node)) => Some(node.to_wasm_value(&ty, src)?),
-            (None, None) => None,
-            (Some(_), None) => return Err(self.wasm_value_error("missing variant payload")),
-            (None, Some(extra)) => return Err(extra.wasm_value_error("unexpected variant payload")),
-        };
+            .ok_or_else(|| self.wasm_value_error(WasmValueError::UnknownCase(label.into())))?;
+        let payload_value = self.to_wasm_maybe_payload(label, &payload_type, payload, src)?;
         V::make_variant(ty, label, payload_value).map_err(|err| self.wasm_value_error(err))
     }
 
@@ -310,45 +313,37 @@ impl Node {
 
     fn to_wasm_option<V: WasmValue>(&self, ty: &V::Type, src: &str) -> Result<V, ParserError> {
         let payload_type = ty.option_some_type().unwrap();
-
-        let value = if matches!(self.ty, NodeType::OptionSome | NodeType::OptionNone) {
-            self.as_option()?
-                .map(|node| node.to_wasm_value(&payload_type, src))
-                .transpose()?
-        } else if flattenable(payload_type.kind()) {
-            // Parse "flattened" `some` payload
-            Some(self.to_wasm_value(&payload_type, src)?)
-        } else {
-            return Err(self.error(ParserErrorKind::InvalidType));
+        let value = match self.ty {
+            NodeType::OptionSome => {
+                self.to_wasm_maybe_payload("some", &Some(payload_type), self.as_option()?, src)?
+            }
+            NodeType::OptionNone => {
+                self.to_wasm_maybe_payload("none", &None, self.as_option()?, src)?
+            }
+            _ if flattenable(payload_type.kind()) => Some(self.to_wasm_value(&payload_type, src)?),
+            _ => {
+                return Err(self.error(ParserErrorKind::InvalidType));
+            }
         };
         V::make_option(ty, value).map_err(|err| self.wasm_value_error(err))
     }
 
     fn to_wasm_result<V: WasmValue>(&self, ty: &V::Type, src: &str) -> Result<V, ParserError> {
         let (ok_type, err_type) = ty.result_types().unwrap();
-        let value = if matches!(self.ty, NodeType::ResultOk | NodeType::ResultErr) {
-            match self.as_result()? {
-                Ok(payload) => match (ok_type, payload) {
-                    (Some(ty), Some(node)) => Ok(Some(node.to_wasm_value(&ty, src)?)),
-                    (None, None) => Ok(None),
-                    (Some(_), None) => return Err(self.wasm_value_error("missing ok payload")),
-                    (None, Some(extra)) => {
-                        return Err(extra.wasm_value_error("unexpected ok payload"))
-                    }
-                },
-                Err(payload) => match (err_type, payload) {
-                    (Some(ty), Some(node)) => Err(Some(node.to_wasm_value(&ty, src)?)),
-                    (None, None) => Err(None),
-                    (Some(_), None) => return Err(self.wasm_value_error("missing err payload")),
-                    (None, Some(extra)) => {
-                        return Err(extra.wasm_value_error("unexpected err payload"))
-                    }
-                },
+        let value = match self.ty {
+            NodeType::ResultOk => {
+                Ok(self.to_wasm_maybe_payload("ok", &ok_type, self.as_result()?.unwrap(), src)?)
             }
-        } else if ok_type.as_ref().is_some_and(|ty| flattenable(ty.kind())) {
-            Ok(Some(self.to_wasm_value(ok_type.as_ref().unwrap(), src)?))
-        } else {
-            return Err(self.error(ParserErrorKind::InvalidType));
+            NodeType::ResultErr => Err(self.to_wasm_maybe_payload(
+                "err",
+                &err_type,
+                self.as_result()?.unwrap_err(),
+                src,
+            )?),
+            _ => match ok_type {
+                Some(ty) if flattenable(ty.kind()) => Ok(Some(self.to_wasm_value(&ty, src)?)),
+                _ => return Err(self.error(ParserErrorKind::InvalidType)),
+            },
         };
         V::make_result(ty, value).map_err(|err| self.wasm_value_error(err))
     }
@@ -357,8 +352,27 @@ impl Node {
         V::make_flags(ty, self.as_flags(src)?).map_err(|err| self.wasm_value_error(err))
     }
 
-    fn wasm_value_error(&self, err: impl Display) -> ParserError {
-        ParserError::with_detail(ParserErrorKind::WasmValueError, self.span(), err)
+    fn to_wasm_maybe_payload<V: WasmValue>(
+        &self,
+        case: &str,
+        payload_type: &Option<V::Type>,
+        payload: Option<&Node>,
+        src: &str,
+    ) -> Result<Option<V>, ParserError> {
+        match (payload_type.as_ref(), payload) {
+            (Some(ty), Some(node)) => Ok(Some(node.to_wasm_value(ty, src)?)),
+            (None, None) => Ok(None),
+            (Some(_), None) => {
+                Err(self.wasm_value_error(WasmValueError::MissingPayload(case.into())))
+            }
+            (None, Some(_)) => {
+                Err(self.wasm_value_error(WasmValueError::UnexpectedPayload(case.into())))
+            }
+        }
+    }
+
+    fn wasm_value_error(&self, err: WasmValueError) -> ParserError {
+        ParserError::with_source(ParserErrorKind::WasmValueError, self.span(), err)
     }
 
     pub(crate) fn slice<'src>(&self, src: &'src str) -> &'src str {
