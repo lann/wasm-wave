@@ -14,8 +14,7 @@ use crate::{
 /// A Web Assembly Value Encoding parser.
 pub struct Parser<'source> {
     lex: Lexer<'source>,
-    curr: Option<(Token, Span)>,
-    next: Option<Result<(Token, Span), ParserError>>,
+    curr: Option<Token>,
 }
 
 impl<'source> Parser<'source> {
@@ -29,7 +28,6 @@ impl<'source> Parser<'source> {
         Self {
             lex: lexer,
             curr: None,
-            next: Default::default(),
         }
     }
 
@@ -59,13 +57,9 @@ impl<'source> Parser<'source> {
 
     /// Returns an error if any significant input remains unparsed.
     pub fn finish(&mut self) -> Result<(), ParserError> {
-        match self.ensure_next() {
-            Err(ParserError {
-                kind: ParserErrorKind::UnexpectedEnd,
-                ..
-            }) => Ok(()),
-            Err(err) => Err(err.clone()),
-            Ok((_, span)) => Err(ParserError::new(
+        match self.lex.clone().spanned().next() {
+            None => Ok(()),
+            Some((_, span)) => Err(ParserError::new(
                 ParserErrorKind::TrailingCharacters,
                 span.clone(),
             )),
@@ -253,36 +247,30 @@ impl<'source> Parser<'source> {
         Ok(self.leaf_node(NodeType::Label))
     }
 
-    fn ensure_next(&mut self) -> &Result<(Token, Span), ParserError> {
-        self.next.get_or_insert_with(|| {
-            let token_res = self.lex.next();
-            let span = self.lex.span();
-            match token_res {
-                Some(Ok(token)) => Ok((token, span)),
-                Some(Err(maybe_span)) => {
-                    let span = maybe_span.unwrap_or(span);
-                    Err(ParserError::new(ParserErrorKind::InvalidToken, span))
-                }
-                None => Err(ParserError::new(ParserErrorKind::UnexpectedEnd, span)),
-            }
-        })
-    }
-
     fn advance(&mut self) -> Result<Token, ParserError> {
-        if let Err(err) = self.ensure_next() {
-            return Err(err.clone());
-        }
-        let (token, span) = self.next.take().unwrap().unwrap();
-        self.curr = Some((token, span));
+        let token = match self.lex.next() {
+            Some(Ok(token)) => token,
+            Some(Err(span)) => {
+                let span = span.unwrap_or_else(|| self.lex.span());
+                return Err(ParserError::new(ParserErrorKind::InvalidToken, span));
+            }
+            None => {
+                return Err(ParserError::new(
+                    ParserErrorKind::UnexpectedEnd,
+                    self.lex.span(),
+                ));
+            }
+        };
+        self.curr = Some(token);
         Ok(token)
     }
 
     fn token(&self) -> Token {
-        self.curr.as_ref().unwrap().0
+        self.curr.unwrap()
     }
 
     fn span(&self) -> Span {
-        self.curr.as_ref().unwrap().1.clone()
+        self.lex.span()
     }
 
     fn slice(&self) -> &'source str {
@@ -290,9 +278,7 @@ impl<'source> Parser<'source> {
     }
 
     fn next_is(&mut self, token: Token) -> bool {
-        self.ensure_next()
-            .as_ref()
-            .is_ok_and(|(next, _)| next == &token)
+        self.lex.clone().next().and_then(|res| res.ok()) == Some(token)
     }
 
     fn expect_token(&self, token: Token) -> Result<(), ParserError> {
