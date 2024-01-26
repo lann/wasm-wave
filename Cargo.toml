@@ -32,5 +32,5 @@ snapbox = { version = "0.4.16", features = ["harness"] }
 wasmtime = { workspace = true, optional = false, features = ["cranelift"] }
 
 [workspace.dependencies]
-wasmtime = { version = "16.0.0", default-features = false, features = ["component-model"] }
+wasmtime = { version = "17.0.0", default-features = false, features = ["component-model"] }
 wit-parser = "0.13.1"
