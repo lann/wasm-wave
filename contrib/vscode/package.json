@@ -1,0 +1,25 @@
+{
+  "name": "wasm-wave",
+  "displayName": "Wave",
+  "description": "",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.86.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "contributes": {
+    "languages": [{
+      "id": "wave",
+      "aliases": ["WAVE", "wave"],
+      "extensions": [".wave"],
+      "configuration": "./language-configuration.json"
+    }],
+    "grammars": [{
+      "language": "wave",
+      "scopeName": "source.wave",
+      "path": "./syntaxes/wave.tmLanguage.json"
+    }]
+  }
+}
