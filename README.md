@@ -38,6 +38,10 @@ Values are encoded as Unicode text. UTF-8 should be used wherever an interoperab
 
 Whitespace is _insignificant between tokens_ and _significant within tokens_: keywords, labels, chars, and strings.
 
+### Comments
+
+Comments start with `//` and run to the end of the line.
+
 ### Keywords
 
 Several tokens are reserved WAVE keywords: `true`, `false`, `inf`, `nan`, `some`, `none`, `ok`, `err`. Variant or enum cases that match one of these keywords must be prefixed with `%`.
