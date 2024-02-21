@@ -54,12 +54,16 @@ pub enum Token {
     LabelOrKeyword,
 
     /// A char literal
-    #[regex(r#"'([^\\']{1,4}|(?&char_escape))'"#, validate_char)]
+    #[regex(r#"'([^\\'\n]{1,4}|(?&char_escape))'"#, validate_char)]
     Char,
 
     /// A string literal
-    #[regex(r#""([^\\"]|(?&char_escape))*""#)]
+    #[regex(r#""([^\\"\n]|(?&char_escape))*""#)]
     String,
+
+    /// A multi-line string literal
+    #[token(r#"""""#, lex_multiline_string)]
+    MultilineString,
 }
 
 impl Display for Token {
@@ -74,6 +78,15 @@ fn validate_char(lex: &mut Lexer) -> Result<(), Option<Span>> {
         Ok(())
     } else {
         Err(Some(lex.span()))
+    }
+}
+
+fn lex_multiline_string(lex: &mut Lexer) -> bool {
+    if let Some(end) = lex.remainder().find(r#"""""#) {
+        lex.bump(end + 3);
+        true
+    } else {
+        false
     }
 }
 

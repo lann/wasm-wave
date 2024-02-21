@@ -8,11 +8,12 @@
 pub mod ast;
 pub mod lex;
 pub mod parser;
+mod strings;
 pub mod untyped;
 pub mod value;
+pub mod wasm;
 pub mod writer;
 
-pub mod wasm;
 #[cfg(feature = "wasmtime")]
 /// Implementations for [`wasmtime`] types.
 pub mod wasmtime;

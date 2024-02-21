@@ -39,9 +39,15 @@ char-char ::= common-char | '"'
 string ::= '"' string-char* '"'
 string-char ::= common-char | [']
 
-common-char ::= <any Unicode Scalar Value except ['"\]>
+multiline-string ::= '"""' line-break multiline-string-line* [ ]* '"""'
+multiline-string-line ::= [ ]* multiline-string-char* line-break
+multiline-string-char ::= common-char | ['"]
+
+line-break ::= '\r\n' | '\n'
+
+common-char ::= <any Unicode Scalar Value except ['"\n\\]>
               | '\' escape
-escape ::= ['"tnr\] | escape-unicode
+escape ::= ['"tnr\\] | escape-unicode
 escape-unicode ::= 'u{' [0-9a-fA-F]+ '}'
 
 variant-case ::= label ws variant-case-payload?
@@ -75,3 +81,4 @@ word ::= [a-z][a-z0-9]*
 
 * "`Unicode scalar value`" is defined by Unicode
 * `escape-unicode` must identify a valid Unicode scalar value.
+* `multiline-string-line` must not contain `"""`

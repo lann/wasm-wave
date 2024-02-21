@@ -71,6 +71,7 @@ impl<'source> Parser<'source> {
             Token::Number => self.leaf_node(NodeType::Number),
             Token::Char => self.leaf_node(NodeType::Char),
             Token::String => self.leaf_node(NodeType::String),
+            Token::MultilineString => self.leaf_node(NodeType::MultilineString),
             Token::ParenOpen => self.parse_tuple()?,
             Token::BracketOpen => self.parse_list()?,
             Token::BraceOpen => self.parse_record_or_flags()?,
@@ -84,7 +85,11 @@ impl<'source> Parser<'source> {
                 Some(Keyword::Inf | Keyword::Nan) => self.leaf_node(NodeType::Number),
                 None => self.parse_label_maybe_payload()?,
             },
-            _ => return Err(self.unexpected_token()),
+            Token::BraceClose
+            | Token::ParenClose
+            | Token::BracketClose
+            | Token::Colon
+            | Token::Comma => return Err(self.unexpected_token()),
         })
     }
 
@@ -406,6 +411,7 @@ pub enum ParserErrorKind {
     EmptyTuple,
     MultipleChars,
     InvalidEscape,
+    InvalidMultilineString,
     InvalidParams,
     InvalidToken,
     InvalidType,
@@ -424,6 +430,7 @@ impl Display for ParserErrorKind {
             ParserErrorKind::EmptyTuple => "empty tuple",
             ParserErrorKind::MultipleChars => "multiple characters in char value",
             ParserErrorKind::InvalidEscape => "invalid character escape",
+            ParserErrorKind::InvalidMultilineString => "invalid multiline string",
             ParserErrorKind::InvalidParams => "invalid params",
             ParserErrorKind::InvalidToken => "invalid token",
             ParserErrorKind::InvalidType => "invalid value type",
