@@ -87,11 +87,50 @@ Chars are encoded as `'<char>'`, where `<char>` is one of:
   - `\r` → U+D (CR)
   - `\u{···}` → U+··· (where `···` is a hexadecimal Unicode Scalar Value)
 
-Escaping `\` and `'` is mandatory for chars.
+Escaping newline (`\n`), `\`, and `'` is mandatory for chars.
 
 ### Strings
 
-Strings are encoded as a double-quote-delimited sequence of `<char>`s (as for [Chars](#chars)). Escaping `\` and `"` is mandatory for strings.
+Strings are encoded as a double-quote-delimited sequence of `<char>`s (as for [Chars](#chars)).
+
+Escaping newline (`\n`), `\`, and `"` is mandatory for strings.
+
+### Multiline Strings
+
+A multiline string begins with `"""` followed immediately by a line break (`\n` or `\r\n`) and ends with a line break, zero or more spaces, and `"""`. The number of spaces immediately preceding the ending `"""` determines the indent level of the entire multiline string. Every other line break in the string must be followed by at least this many spaces which are then omitted ("dedented") from the decoded string.
+
+Each line break in the encoded string except for the first and last is decoded as a newline character (`\n`).
+
+Escaping `\` is mandatory for multiline strings. Escaping carriage return (`\r`) is mandatory immediately before a literal newline character (`\n`) if it is to be retained. Escaping `"` is mandatory where necessary to break up any sequence of `"""` within a string, even if the first `"` is escaped (i.e. `\"""` is prohibited).
+
+```python
+"""
+A single line
+"""
+```
+→ `"A single line"`
+
+```python
+"""
+    Indentation determined
+      by ending delimiter
+  """
+```
+→
+```clike
+"  Indentation determined\n    by ending delimiter"
+```
+
+```python
+"""
+  Must escape carriage return at end of line: \r
+  Must break up double quote triplets: ""\""
+  """
+```
+→
+```clike
+"Must escape carriage return at end of line: \r\nMust break up double quote triplets: \"\"\"\""
+```
 
 ### Tuples
 

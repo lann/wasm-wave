@@ -58,7 +58,7 @@ fn test(path: &Path) -> Result<String, Box<dyn std::error::Error>> {
             Ok((func_name, func_type, values)) => {
                 assert!(
                     !filename.starts_with("reject-"),
-                    "accepted input in in {filename}"
+                    "accepted input {input:?} in {filename}"
                 );
                 write!(out, "{func_name}(")?;
                 let mut first = true;
@@ -75,7 +75,7 @@ fn test(path: &Path) -> Result<String, Box<dyn std::error::Error>> {
             Err(err) => {
                 assert!(
                     !filename.starts_with("accept-"),
-                    "rejected input in in {filename}"
+                    "rejected input {input:?} in {filename}: {err:#}"
                 );
                 writeln!(out, "{err}")?;
             }

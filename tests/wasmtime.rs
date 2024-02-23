@@ -57,7 +57,7 @@ fn test_round_trip_variations() {
         ("floats", "(1e+10, -5.5e-5)", "(10000000000, -0.000055)"),
         ("floats", "(0.00e100, 1.0e0)", "(0, 1)"),
         ("options", "(1, some(-1))", "(some(1), some(some(-1)))"),
-        ("list-strings", "[\"a\nb\rc\td\",]", r#"["a\nb\rc\td"]"#),
+        ("list-strings", "[\"b\rc\td\",]", r#"["b\rc\td"]"#),
         ("result-ok-only", "1", "ok(1)"),
         ("record", "{required: 1 ,optional: none ,}", "{required: 1}"),
         ("flags", "{read,}", "{read}"),

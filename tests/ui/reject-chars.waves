@@ -2,6 +2,7 @@
 char('');
 char('ab');
 char('☃☃');
+char('\n\n');
 // Invalid escapes
 char('\z');
 char('\x1f');
@@ -20,3 +21,8 @@ char('\u{DFFF}');
 char(');
 char(x');
 char('x);
+// Missing mandatory escapes
+char('\');
+char(''');
+char('
+');

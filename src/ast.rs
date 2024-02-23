@@ -1,14 +1,11 @@
 //! Abstract syntax tree types
 
-use std::{
-    borrow::Cow,
-    collections::HashMap,
-    str::{Chars, FromStr},
-};
+use std::{borrow::Cow, collections::HashMap, str::FromStr};
 
 use crate::{
     lex::Span,
     parser::{ParserError, ParserErrorKind},
+    strings::{unescape, StringPartsIter},
     wasm::{WasmType, WasmTypeKind, WasmValue, WasmValueError},
 };
 
@@ -64,13 +61,15 @@ impl Node {
     /// Returns a char value if this node represents a valid char.
     pub fn as_char(&self, src: &str) -> Result<char, ParserError> {
         self.ensure_type(NodeType::Char)?;
-        let mut chars = self.slice(src).chars();
-        assert_eq!(chars.next(), Some('\''));
-        let Ok(Some(ch)) = unescape(&mut chars) else {
-            return Err(self.error(ParserErrorKind::InvalidEscape));
+        let inner = &src[self.span.start + 1..self.span.end - 1];
+        let (ch, len) = if inner.starts_with('\\') {
+            unescape(inner).ok_or_else(|| self.error(ParserErrorKind::InvalidEscape))?
+        } else {
+            let ch = inner.chars().next().unwrap();
+            (ch, ch.len_utf8())
         };
-        // Verify that we only have one char
-        if chars.as_str() != "'" {
+        // Verify length
+        if len != inner.len() {
             return Err(self.error(ParserErrorKind::MultipleChars));
         }
         Ok(ch)
@@ -78,19 +77,44 @@ impl Node {
 
     /// Returns a str value if this node represents a valid string.
     pub fn as_str<'src>(&self, src: &'src str) -> Result<Cow<'src, str>, ParserError> {
-        self.ensure_type(NodeType::String)?;
-        let src = &src[self.span.start + 1..self.span.end - 1];
-        if !src.contains('\\') {
-            return Ok(Cow::Borrowed(src));
+        let mut parts = self.iter_str(src)?;
+        let Some(first) = parts.next().transpose()? else {
+            return Ok("".into());
+        };
+        match parts.next().transpose()? {
+            // Single part may be borrowed
+            None => Ok(first),
+            // Multiple parts must be collected into a single owned String
+            Some(second) => {
+                let s: String = [Ok(first), Ok(second)]
+                    .into_iter()
+                    .chain(parts)
+                    .collect::<Result<_, _>>()?;
+                Ok(s.into())
+            }
         }
-        let mut chars = src.chars();
-        std::iter::from_fn(|| {
-            unescape(&mut chars)
-                // TODO: more precise error span
-                .map_err(|()| self.error(ParserErrorKind::InvalidEscape))
-                .transpose()
-        })
-        .collect()
+    }
+
+    /// Returns an iterator of string "parts" which together form a decoded
+    /// string value if this node represents a valid string.
+    pub fn iter_str<'src>(
+        &self,
+        src: &'src str,
+    ) -> Result<impl Iterator<Item = Result<Cow<'src, str>, ParserError>>, ParserError> {
+        match self.ty {
+            NodeType::String => {
+                let span = self.span.start + 1..self.span.end - 1;
+                Ok(StringPartsIter::new(&src[span.clone()], span.start))
+            }
+            NodeType::MultilineString => {
+                let span = self.span.start + 3..self.span.end - 3;
+                Ok(StringPartsIter::new_multiline(
+                    &src[span.clone()],
+                    span.start,
+                )?)
+            }
+            _ => Err(self.error(ParserErrorKind::InvalidType)),
+        }
     }
 
     /// Returns an iterator of value nodes if this node represents a tuple.
@@ -152,7 +176,7 @@ impl Node {
     /// Returns a result value with optional payload value if this node
     /// represents a result.
     pub fn as_result(&self) -> Result<Result<Option<&Node>, Option<&Node>>, ParserError> {
-        let payload = self.children.get(0);
+        let payload = self.children.first();
         match self.ty {
             NodeType::ResultOk => Ok(Ok(payload)),
             NodeType::ResultErr => Ok(Err(payload)),
@@ -397,40 +421,6 @@ fn flattenable(kind: WasmTypeKind) -> bool {
     !matches!(kind, WasmTypeKind::Option | WasmTypeKind::Result)
 }
 
-fn unescape(chars: &mut Chars) -> Result<Option<char>, ()> {
-    let Some(first) = chars.next() else {
-        return Ok(None);
-    };
-    if first != '\\' {
-        return Ok(Some(first));
-    }
-    Ok(Some(match chars.next().ok_or(())? {
-        '\\' => '\\',
-        '\'' => '\'',
-        '"' => '"',
-        't' => '\t',
-        'n' => '\n',
-        'r' => '\r',
-        'u' => {
-            if chars.next() != Some('{') {
-                return Err(());
-            }
-            let mut val = 0;
-            let mut empty = true;
-            loop {
-                let ch = chars.next().ok_or(())?;
-                if ch == '}' && !empty {
-                    break;
-                }
-                empty = false;
-                val = (val << 4) | ch.to_digit(16).ok_or(())?;
-            }
-            char::from_u32(val).ok_or(())?
-        }
-        _ => unreachable!(),
-    }))
-}
-
 /// The type of a WAVE AST [`Node`].
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum NodeType {
@@ -447,6 +437,9 @@ pub enum NodeType {
     /// String
     /// Span includes delimiters.
     String,
+    /// Multiline String
+    /// Span includes delimiters.
+    MultilineString,
     /// Tuple
     /// Child nodes are the tuple values.
     Tuple,

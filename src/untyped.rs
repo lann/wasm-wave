@@ -131,7 +131,9 @@ impl std::fmt::Display for UntypedFuncCall<'_> {
 fn fmt_node(f: &mut impl std::fmt::Write, node: &Node, src: &str) -> std::fmt::Result {
     use crate::ast::NodeType::*;
     match node.ty() {
-        BoolTrue | BoolFalse | Number | Char | String | Label => f.write_str(node.slice(src)),
+        BoolTrue | BoolFalse | Number | Char | String | MultilineString | Label => {
+            f.write_str(node.slice(src))
+        }
         Tuple => fmt_sequence(f, '(', ')', node.as_tuple()?, src),
         List => fmt_sequence(f, '[', ']', node.as_list()?, src),
         Record => {
