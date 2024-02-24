@@ -17,7 +17,7 @@ wit = ["dep:wit-parser"]
 
 [dependencies]
 indexmap = "2.0.0"
-logos = "0.13.0"
+logos = "0.14.0"
 thiserror = "1.0.48"
 wasmtime = { workspace = true, optional = true }
 wit-parser = { workspace = true, optional = true }
@@ -28,9 +28,9 @@ path = "tests/ui.rs"
 harness = false
 
 [dev-dependencies]
-snapbox = { version = "0.4.16", features = ["harness"] }
+snapbox = { version = "0.5.6", features = ["harness"] }
 wasmtime = { workspace = true, optional = false, features = ["cranelift"] }
 
 [workspace.dependencies]
-wasmtime = { version = "17.0.0", default-features = false, features = ["component-model"] }
-wit-parser = "0.13.1"
+wasmtime = { version = "18.0.1", default-features = false, features = ["component-model", "runtime"] }
+wit-parser = "0.200.0"
