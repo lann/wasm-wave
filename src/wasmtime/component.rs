@@ -241,6 +241,18 @@ impl WasmValue for component::Val {
     }
 }
 
+impl WasmFunc for component::types::ComponentFunc {
+    type Type = component::Type;
+
+    fn params(&self) -> Box<dyn Iterator<Item = Self::Type> + '_> {
+        Box::new(self.params())
+    }
+
+    fn results(&self) -> Box<dyn Iterator<Item = Self::Type> + '_> {
+        Box::new(self.results())
+    }
+}
+
 /// Represents a [`wasmtime::component::Func`] type.
 #[derive(Clone)]
 pub struct FuncType {

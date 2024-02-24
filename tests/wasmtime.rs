@@ -1,7 +1,8 @@
 use std::sync::{Mutex, OnceLock};
 
+use wasm_wave::wasm::DisplayFunc;
 use wasmtime::{
-    component::{Component, Instance, Linker, Type, Val},
+    component::{types::ComponentItem, Component, Instance, Linker, Type, Val},
     Config, Engine, Store,
 };
 
@@ -79,6 +80,24 @@ fn test_wasmtime_get_func_type() {
 
     assert_eq!(
         func.to_string(),
+        "func(bool, enum { first, second }) -> result<u8>"
+    );
+}
+
+#[test]
+fn test_wasmtime_component_func_type() {
+    let engine = Engine::new(Config::new().wasm_component_model(true)).expect("engine");
+    let component = Component::from_file(&engine, "tests/types.wasm").expect("component");
+    let linker = Linker::<()>::new(&engine);
+    let component_type = linker.substituted_component_type(&component).unwrap();
+    let func_item = component_type
+        .get_export("func-type")
+        .expect("missing export");
+    let ComponentItem::ComponentFunc(func_type) = func_item else {
+        panic!("incorrect item type {func_item:?}");
+    };
+    assert_eq!(
+        DisplayFunc(func_type).to_string(),
         "func(bool, enum { first, second }) -> result<u8>"
     );
 }
