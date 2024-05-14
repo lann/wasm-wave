@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use crate::wasm::{WasmType, WasmValueError};
+use crate::wasm::{WasmType, WasmTypeKind, WasmValueError};
 
 /// The WasmValue trait may be implemented to represent values to be
 /// (de)serialized with WAVE, notably [`value::Value`](crate::value::Value)
@@ -15,6 +15,9 @@ pub trait WasmValue: Clone + Sized {
 
     /// The type of this value.
     fn ty(&self) -> Self::Type;
+
+    /// The kind of type of this value.
+    fn kind(&self) -> WasmTypeKind;
 
     /// Returns a new WasmValue of the given type.
     /// # Panics
@@ -326,4 +329,13 @@ macro_rules! unwrap_val {
         }
     };
 }
+macro_rules! unwrap_2val {
+    ($val:expr, $case:path, $name:expr) => {
+        match $val {
+            $case(n, v) => (n, v),
+            _ => panic!("called unwrap_{name} on non-{name} value", name = $name),
+        }
+    };
+}
+pub(crate) use unwrap_2val;
 pub(crate) use unwrap_val;

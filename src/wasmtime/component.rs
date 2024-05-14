@@ -5,8 +5,8 @@ use wasmtime::component;
 use crate::{
     canonicalize_nan32, canonicalize_nan64,
     wasm::{
-        ensure_type_kind, maybe_unwrap_type, unwrap_val, DisplayFunc, WasmFunc, WasmType,
-        WasmTypeKind, WasmValueError,
+        ensure_type_kind, maybe_unwrap_type, unwrap_2val, unwrap_val, DisplayFunc, WasmFunc,
+        WasmType, WasmTypeKind, WasmValueError,
     },
     WasmValue,
 };
@@ -107,7 +107,60 @@ impl WasmValue for component::Val {
     type Type = component::Type;
 
     fn ty(&self) -> Self::Type {
-        self.ty()
+        match self {
+            Self::Bool(_) => component::Type::Bool,
+            Self::S8(_) => component::Type::S8,
+            Self::U8(_) => component::Type::U8,
+            Self::S16(_) => component::Type::S16,
+            Self::U16(_) => component::Type::U16,
+            Self::S32(_) => component::Type::S32,
+            Self::U32(_) => component::Type::U32,
+            Self::S64(_) => component::Type::S64,
+            Self::U64(_) => component::Type::U64,
+            Self::Float32(_) => component::Type::Float32,
+            Self::Float64(_) => component::Type::Float64,
+            Self::Char(_) => component::Type::Char,
+            Self::String(_) => component::Type::String,
+            _ => unimplemented!(),
+            /*
+            Self::List(_) => component::Type::List ...,
+            Self::Record(_) => component::Type::Record ...,
+            Self::Tuple(_) => component::Type::Tuple ...,
+            Self::Variant(_, _) => component::Type::Variant ...,
+            Self::Enum(_) => component::Type::Enum ...,
+            Self::Option(_) => component::Type::Option ...,
+            Self::Result(_) => component::Type::Result ...,
+            Self::Flags(_) => component::Type::Flags ...,
+            Self::Resource(_) => WasmTypeKind::Unsupported,
+             */
+        }
+    }
+
+    fn kind(&self) -> WasmTypeKind {
+        match self {
+            Self::Bool(_) => WasmTypeKind::Bool,
+            Self::S8(_) => WasmTypeKind::S8,
+            Self::U8(_) => WasmTypeKind::U8,
+            Self::S16(_) => WasmTypeKind::S16,
+            Self::U16(_) => WasmTypeKind::U16,
+            Self::S32(_) => WasmTypeKind::S32,
+            Self::U32(_) => WasmTypeKind::U32,
+            Self::S64(_) => WasmTypeKind::S64,
+            Self::U64(_) => WasmTypeKind::U64,
+            Self::Float32(_) => WasmTypeKind::Float32,
+            Self::Float64(_) => WasmTypeKind::Float64,
+            Self::Char(_) => WasmTypeKind::Char,
+            Self::String(_) => WasmTypeKind::String,
+            Self::List(_) => WasmTypeKind::List,
+            Self::Record(_) => WasmTypeKind::Record,
+            Self::Tuple(_) => WasmTypeKind::Tuple,
+            Self::Variant(..) => WasmTypeKind::Variant,
+            Self::Enum(_) => WasmTypeKind::Enum,
+            Self::Option(_) => WasmTypeKind::Option,
+            Self::Result(_) => WasmTypeKind::Result,
+            Self::Flags(_) => WasmTypeKind::Flags,
+            Self::Resource(_) => WasmTypeKind::Unsupported,
+        }
     }
 
     impl_primitives!(
@@ -140,60 +193,61 @@ impl WasmValue for component::Val {
         vals: impl IntoIterator<Item = Self>,
     ) -> Result<Self, WasmValueError> {
         ensure_type_kind(ty, WasmTypeKind::List)?;
-        ty.unwrap_list()
-            .new_val(vals.into_iter().collect())
-            .map_err(WasmValueError::other)
+        Ok(Self::List(vals.into_iter().collect()))
     }
     fn make_record<'a>(
         ty: &Self::Type,
         fields: impl IntoIterator<Item = (&'a str, Self)>,
     ) -> Result<Self, WasmValueError> {
-        ty.unwrap_record()
-            .new_val(fields)
-            .map_err(WasmValueError::other)
+        ensure_type_kind(ty, WasmTypeKind::Record)?;
+        let values: Vec<(String, Self)> = fields
+            .into_iter()
+            .map(|(name, val)| (name.to_string(), val))
+            .collect();
+
+        Ok(Self::Record(values))
     }
     fn make_tuple(
         ty: &Self::Type,
         vals: impl IntoIterator<Item = Self>,
     ) -> Result<Self, WasmValueError> {
-        ty.unwrap_tuple()
-            .new_val(vals.into_iter().collect())
-            .map_err(WasmValueError::other)
+        ensure_type_kind(ty, WasmTypeKind::Tuple)?;
+        Ok(Self::Tuple(vals.into_iter().collect()))
     }
     fn make_variant(
         ty: &Self::Type,
         case: &str,
         val: Option<Self>,
     ) -> Result<Self, WasmValueError> {
-        ty.unwrap_variant()
-            .new_val(case, val)
-            .map_err(WasmValueError::other)
+        ensure_type_kind(ty, WasmTypeKind::Variant)?;
+        Ok(Self::Variant(case.to_string(), val.map(Box::new)))
     }
     fn make_enum(ty: &Self::Type, case: &str) -> Result<Self, WasmValueError> {
-        ty.unwrap_enum()
-            .new_val(case)
-            .map_err(WasmValueError::other)
+        ensure_type_kind(ty, WasmTypeKind::Enum)?;
+        Ok(Self::Enum(case.to_string()))
     }
     fn make_option(ty: &Self::Type, val: Option<Self>) -> Result<Self, WasmValueError> {
-        ty.unwrap_option()
-            .new_val(val)
-            .map_err(WasmValueError::other)
+        ensure_type_kind(ty, WasmTypeKind::Option)?;
+        Ok(Self::Option(val.map(Box::new)))
     }
     fn make_result(
         ty: &Self::Type,
         val: Result<Option<Self>, Option<Self>>,
     ) -> Result<Self, WasmValueError> {
-        ty.unwrap_result()
-            .new_val(val)
-            .map_err(WasmValueError::other)
+        ensure_type_kind(ty, WasmTypeKind::Result)?;
+        Ok(match val {
+            Ok(val) => Self::Result(Ok(val.map(Box::new))),
+            Err(val) => Self::Result(Err(val.map(Box::new))),
+        })
     }
     fn make_flags<'a>(
         ty: &Self::Type,
         names: impl IntoIterator<Item = &'a str>,
     ) -> Result<Self, WasmValueError> {
-        ty.unwrap_flags()
-            .new_val(&names.into_iter().collect::<Vec<_>>())
-            .map_err(WasmValueError::other)
+        ensure_type_kind(ty, WasmTypeKind::Flags)?;
+        Ok(Self::Flags(
+            names.into_iter().map(|n| n.to_string()).collect(),
+        ))
     }
 
     fn unwrap_float32(&self) -> f32 {
@@ -205,7 +259,7 @@ impl WasmValue for component::Val {
         canonicalize_nan64(val)
     }
     fn unwrap_string(&self) -> Cow<str> {
-        unwrap_val!(self, Self::String, "string").as_ref().into()
+        unwrap_val!(self, Self::String, "string").into()
     }
     fn unwrap_list(&self) -> Box<dyn Iterator<Item = Cow<Self>> + '_> {
         let list = unwrap_val!(self, Self::List, "list");
@@ -213,31 +267,33 @@ impl WasmValue for component::Val {
     }
     fn unwrap_record(&self) -> Box<dyn Iterator<Item = (Cow<str>, Cow<Self>)> + '_> {
         let record = unwrap_val!(self, Self::Record, "record");
-        Box::new(record.fields().map(|(name, val)| (name.into(), cow(val))))
+        Box::new(record.iter().map(|(name, val)| (name.into(), cow(val))))
     }
     fn unwrap_tuple(&self) -> Box<dyn Iterator<Item = Cow<Self>> + '_> {
         let tuple = unwrap_val!(self, Self::Tuple, "tuple");
-        Box::new(tuple.values().iter().map(cow))
+        Box::new(tuple.iter().map(cow))
     }
     fn unwrap_variant(&self) -> (Cow<str>, Option<Cow<Self>>) {
-        let variant = unwrap_val!(self, Self::Variant, "variant");
-        (variant.discriminant().into(), variant.payload().map(cow))
+        let (discriminant, payload) = unwrap_2val!(self, Self::Variant, "variant");
+        (discriminant.into(), payload.as_deref().map(cow))
     }
     fn unwrap_enum(&self) -> Cow<str> {
-        unwrap_val!(self, Self::Enum, "enum").discriminant().into()
+        unwrap_val!(self, Self::Enum, "enum").into()
     }
     fn unwrap_option(&self) -> Option<Cow<Self>> {
-        unwrap_val!(self, Self::Option, "option").value().map(cow)
+        unwrap_val!(self, Self::Option, "option")
+            .as_deref()
+            .map(cow)
     }
     fn unwrap_result(&self) -> Result<Option<Cow<Self>>, Option<Cow<Self>>> {
-        match unwrap_val!(self, Self::Result, "result").value() {
-            Ok(val) => Ok(val.map(cow)),
-            Err(val) => Err(val.map(cow)),
+        match unwrap_val!(self, Self::Result, "result") {
+            Ok(t) => Ok(t.as_deref().map(cow)),
+            Err(e) => Err(e.as_deref().map(cow)),
         }
     }
     fn unwrap_flags(&self) -> Box<dyn Iterator<Item = Cow<str>> + '_> {
         let flags = unwrap_val!(self, Self::Flags, "flags");
-        Box::new(flags.flags().map(Into::into))
+        Box::new(flags.iter().map(Into::into))
     }
 }
 

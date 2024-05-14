@@ -159,6 +159,32 @@ impl WasmValue for Value {
         }
     }
 
+    fn kind(&self) -> WasmTypeKind {
+        match &self.0 {
+            ValueEnum::Bool(_) => WasmTypeKind::Bool,
+            ValueEnum::S8(_) => WasmTypeKind::S8,
+            ValueEnum::S16(_) => WasmTypeKind::S16,
+            ValueEnum::S32(_) => WasmTypeKind::S32,
+            ValueEnum::S64(_) => WasmTypeKind::S64,
+            ValueEnum::U8(_) => WasmTypeKind::U8,
+            ValueEnum::U16(_) => WasmTypeKind::U16,
+            ValueEnum::U32(_) => WasmTypeKind::U32,
+            ValueEnum::U64(_) => WasmTypeKind::U64,
+            ValueEnum::Float32(_) => WasmTypeKind::Float32,
+            ValueEnum::Float64(_) => WasmTypeKind::Float64,
+            ValueEnum::Char(_) => WasmTypeKind::Char,
+            ValueEnum::String(_) => WasmTypeKind::String,
+            ValueEnum::List(_) => WasmTypeKind::List,
+            ValueEnum::Record(_) => WasmTypeKind::Record,
+            ValueEnum::Tuple(_) => WasmTypeKind::Tuple,
+            ValueEnum::Variant(_) => WasmTypeKind::Variant,
+            ValueEnum::Enum(_) => WasmTypeKind::Enum,
+            ValueEnum::Option(_) => WasmTypeKind::Option,
+            ValueEnum::Result(_) => WasmTypeKind::Result,
+            ValueEnum::Flags(_) => WasmTypeKind::Flags,
+        }
+    }
+
     impl_primitives!(
         Self,
         (Bool, bool, make_bool, unwrap_bool),

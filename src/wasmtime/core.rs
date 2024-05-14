@@ -38,6 +38,19 @@ impl WasmValue for wasmtime::Val {
         self.ty(store)
     }
 
+    fn kind(&self) -> WasmTypeKind {
+        match self {
+            Self::I32(_) => WasmTypeKind::S32,
+            Self::I64(_) => WasmTypeKind::S64,
+            Self::F32(_) => WasmTypeKind::Float32,
+            Self::F64(_) => WasmTypeKind::Float64,
+            Self::V128(_) => WasmTypeKind::Tuple,
+            Self::FuncRef(_) => WasmTypeKind::Unsupported,
+            Self::ExternRef(_) => WasmTypeKind::Unsupported,
+            Self::AnyRef(_) => WasmTypeKind::Unsupported,
+        }
+    }
+
     fn make_s32(val: i32) -> Self {
         Self::I32(val)
     }

@@ -11,6 +11,7 @@ pub use ty::{WasmType, WasmTypeKind};
 pub use val::WasmValue;
 
 pub(crate) use ty::maybe_unwrap_type;
+pub(crate) use val::unwrap_2val;
 pub(crate) use val::unwrap_val;
 
 /// Returns an error if the given [`WasmType`] is not of the given [`WasmTypeKind`].
