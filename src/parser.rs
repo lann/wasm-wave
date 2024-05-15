@@ -334,7 +334,7 @@ pub struct ParserError {
     kind: ParserErrorKind,
     span: Span,
     detail: Option<String>,
-    source: Option<Box<dyn Error + 'static>>,
+    source: Option<Box<dyn Error + Send + Sync + 'static>>,
 }
 
 impl ParserError {
@@ -359,7 +359,7 @@ impl ParserError {
     pub(crate) fn with_source(
         kind: ParserErrorKind,
         span: Span,
-        source: impl Into<Box<dyn Error>>,
+        source: impl Into<Box<dyn Error + Send + Sync>>,
     ) -> Self {
         Self {
             kind,
@@ -399,7 +399,7 @@ impl Display for ParserError {
 
 impl Error for ParserError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
-        self.source.as_deref()
+        Some(self.source.as_deref()? as _)
     }
 }
 
