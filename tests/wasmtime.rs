@@ -1,6 +1,6 @@
 use std::sync::{Mutex, OnceLock};
 
-use wasm_wave::wasm::DisplayFunc;
+use wasm_wave::wasm::{DisplayFunc, WasmValue};
 use wasmtime::{
     component::{types::ComponentItem, Component, Instance, Linker, Type, Val},
     Config, Engine, Store,
@@ -100,6 +100,20 @@ fn test_wasmtime_component_func_type() {
         DisplayFunc(func_type).to_string(),
         "func(bool, enum { first, second }) -> result<u8>"
     );
+}
+
+#[test]
+fn test_wasmtime_make_list() {
+    let ty = get_type("list-chars");
+    let val = Val::make_list(&ty, [Val::make_char('x')]).unwrap();
+    assert_eq!(val.unwrap_list().next().unwrap().unwrap_char(), 'x');
+}
+
+#[test]
+fn test_wasmtime_make_list_invalid() {
+    let ty = get_type("list-chars");
+    Val::make_list(&ty, [Val::make_bool(false)])
+        .expect_err("make_list with wrong value type should fail");
 }
 
 fn assert_round_trip(type_name: &str, input: &str, output: &str) {
