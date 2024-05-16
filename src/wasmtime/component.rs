@@ -323,18 +323,13 @@ fn ensure_type_val(ty: &component::Type, val: &component::Val) -> Result<(), Was
 
     match val {
         component::Val::List(vals) => {
-            let component::Type::List(list_handle) = ty else {
-                unreachable!(); // kind to kind check above should make this unreachable
-            };
-            let list_type = list_handle.ty();
+            let list_type = ty.unwrap_list().ty();
             for val in vals {
                 ensure_type_val(&list_type, val)?;
             }
         }
         component::Val::Record(vals) => {
-            let component::Type::Record(record_handle) = ty else {
-                unreachable!();
-            };
+            let record_handle = ty.unwrap_record();
             // Check that every non option field type is found in the Vec
             for field in record_handle.fields() {
                 if !matches!(field.ty, component::Type::Option(_))
@@ -355,10 +350,7 @@ fn ensure_type_val(ty: &component::Type, val: &component::Val) -> Result<(), Was
             }
         }
         component::Val::Tuple(vals) => {
-            let component::Type::Tuple(tuple_handle) = ty else {
-                unreachable!();
-            };
-            let field_types = tuple_handle.types();
+            let field_types = ty.unwrap_tuple().types();
             if field_types.len() != vals.len() {
                 return wrong_value_type();
             }
@@ -367,10 +359,7 @@ fn ensure_type_val(ty: &component::Type, val: &component::Val) -> Result<(), Was
             }
         }
         component::Val::Variant(name, optional_payload) => {
-            let component::Type::Variant(variant_handle) = ty else {
-                unreachable!();
-            };
-            if let Some(case) = variant_handle.cases().find(|case| case.name == name) {
+            if let Some(case) = ty.unwrap_variant().cases().find(|case| case.name == name) {
                 match (optional_payload, case.ty) {
                     (None, None) => {}
                     (Some(payload), Some(payload_ty)) => ensure_type_val(&payload_ty, payload)?,
@@ -381,23 +370,15 @@ fn ensure_type_val(ty: &component::Type, val: &component::Val) -> Result<(), Was
             }
         }
         component::Val::Enum(name) => {
-            let component::Type::Enum(enum_handle) = ty else {
-                unreachable!();
-            };
-            if !enum_handle.names().any(|n| n == name) {
+            if !ty.unwrap_enum().names().any(|n| n == name) {
                 return wrong_value_type();
             }
         }
         component::Val::Option(Some(some_val)) => {
-            let component::Type::Option(option_handle) = ty else {
-                unreachable!();
-            };
-            ensure_type_val(&option_handle.ty(), some_val.as_ref())?;
+            ensure_type_val(&ty.unwrap_option().ty(), some_val.as_ref())?;
         }
         component::Val::Result(res_val) => {
-            let component::Type::Result(result_handle) = ty else {
-                unreachable!();
-            };
+            let result_handle = ty.unwrap_result();
             match res_val {
                 Ok(ok) => match (ok, result_handle.ok()) {
                     (None, None) => {}
@@ -412,9 +393,7 @@ fn ensure_type_val(ty: &component::Type, val: &component::Val) -> Result<(), Was
             }
         }
         component::Val::Flags(flags) => {
-            let component::Type::Flags(flags_handle) = ty else {
-                unreachable!();
-            };
+            let flags_handle = ty.unwrap_flags();
             for flag in flags {
                 if !flags_handle.names().any(|n| n == flag) {
                     return wrong_value_type();
