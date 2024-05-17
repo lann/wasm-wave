@@ -31,19 +31,6 @@ impl WasmType for wasmtime::ValType {
 impl WasmValue for wasmtime::Val {
     type Type = wasmtime::ValType;
 
-    fn ty(&self) -> Self::Type {
-        match self {
-            Self::I32(_) => Self::Type::I32,
-            Self::I64(_) => Self::Type::I64,
-            Self::F32(_) => Self::Type::F32,
-            Self::F64(_) => Self::Type::F64,
-            Self::V128(_) => Self::Type::V128,
-            Self::FuncRef(_) => Self::Type::Ref(wasmtime::RefType::FUNCREF),
-            Self::ExternRef(_) => Self::Type::Ref(wasmtime::RefType::EXTERNREF),
-            Self::AnyRef(_) => Self::Type::Ref(wasmtime::RefType::ANYREF),
-        }
-    }
-
     fn kind(&self) -> WasmTypeKind {
         match self {
             Self::I32(_) => WasmTypeKind::S32,

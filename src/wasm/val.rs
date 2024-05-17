@@ -13,9 +13,6 @@ pub trait WasmValue: Clone + Sized {
     /// A type representing types of these values.
     type Type: WasmType;
 
-    /// The type of this value.
-    fn ty(&self) -> Self::Type;
-
     /// The kind of type of this value.
     fn kind(&self) -> WasmTypeKind;
 

@@ -106,36 +106,6 @@ macro_rules! impl_primitives {
 impl WasmValue for component::Val {
     type Type = component::Type;
 
-    fn ty(&self) -> Self::Type {
-        match self {
-            Self::Bool(_) => component::Type::Bool,
-            Self::S8(_) => component::Type::S8,
-            Self::U8(_) => component::Type::U8,
-            Self::S16(_) => component::Type::S16,
-            Self::U16(_) => component::Type::U16,
-            Self::S32(_) => component::Type::S32,
-            Self::U32(_) => component::Type::U32,
-            Self::S64(_) => component::Type::S64,
-            Self::U64(_) => component::Type::U64,
-            Self::Float32(_) => component::Type::Float32,
-            Self::Float64(_) => component::Type::Float64,
-            Self::Char(_) => component::Type::Char,
-            Self::String(_) => component::Type::String,
-            _ => unimplemented!(),
-            /*
-            Self::List(_) => component::Type::List ...,
-            Self::Record(_) => component::Type::Record ...,
-            Self::Tuple(_) => component::Type::Tuple ...,
-            Self::Variant(_, _) => component::Type::Variant ...,
-            Self::Enum(_) => component::Type::Enum ...,
-            Self::Option(_) => component::Type::Option ...,
-            Self::Result(_) => component::Type::Result ...,
-            Self::Flags(_) => component::Type::Flags ...,
-            Self::Resource(_) => WasmTypeKind::Unsupported,
-             */
-        }
-    }
-
     fn kind(&self) -> WasmTypeKind {
         match self {
             Self::Bool(_) => WasmTypeKind::Bool,

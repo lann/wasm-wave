@@ -118,8 +118,35 @@ fn flags_round_trips() {
     test_value_round_trip(Value::make_flags(&ty, ["read", "execute"]).unwrap());
 }
 
+fn local_ty(val: &Value) -> Type {
+    use crate::value::{TypeEnum, ValueEnum};
+    match &val.0 {
+        ValueEnum::Bool(_) => Type::BOOL,
+        ValueEnum::S8(_) => Type::S8,
+        ValueEnum::S16(_) => Type::S16,
+        ValueEnum::S32(_) => Type::S32,
+        ValueEnum::S64(_) => Type::S64,
+        ValueEnum::U8(_) => Type::U8,
+        ValueEnum::U16(_) => Type::U16,
+        ValueEnum::U32(_) => Type::U32,
+        ValueEnum::U64(_) => Type::U64,
+        ValueEnum::Float32(_) => Type::FLOAT32,
+        ValueEnum::Float64(_) => Type::FLOAT64,
+        ValueEnum::Char(_) => Type::CHAR,
+        ValueEnum::String(_) => Type::STRING,
+        ValueEnum::List(inner) => Type(TypeEnum::List(inner.ty.clone())),
+        ValueEnum::Record(inner) => Type(TypeEnum::Record(inner.ty.clone())),
+        ValueEnum::Tuple(inner) => Type(TypeEnum::Tuple(inner.ty.clone())),
+        ValueEnum::Variant(inner) => Type(TypeEnum::Variant(inner.ty.clone())),
+        ValueEnum::Enum(inner) => Type(TypeEnum::Enum(inner.ty.clone())),
+        ValueEnum::Option(inner) => Type(TypeEnum::Option(inner.ty.clone())),
+        ValueEnum::Result(inner) => Type(TypeEnum::Result(inner.ty.clone())),
+        ValueEnum::Flags(inner) => Type(TypeEnum::Flags(inner.ty.clone())),
+    }
+}
+
 fn test_value_round_trip(val: Value) {
-    let ty = val.ty();
+    let ty = local_ty(&val);
     let serialized = crate::to_string(&val).unwrap();
     let deserialized: Value = crate::from_str(&ty, &serialized)
         .unwrap_or_else(|err| panic!("failed to deserialize {serialized:?}: {err}"));

@@ -133,32 +133,6 @@ macro_rules! impl_primitives {
 impl WasmValue for Value {
     type Type = Type;
 
-    fn ty(&self) -> Self::Type {
-        match &self.0 {
-            ValueEnum::Bool(_) => Type::BOOL,
-            ValueEnum::S8(_) => Type::S8,
-            ValueEnum::S16(_) => Type::S16,
-            ValueEnum::S32(_) => Type::S32,
-            ValueEnum::S64(_) => Type::S64,
-            ValueEnum::U8(_) => Type::U8,
-            ValueEnum::U16(_) => Type::U16,
-            ValueEnum::U32(_) => Type::U32,
-            ValueEnum::U64(_) => Type::U64,
-            ValueEnum::Float32(_) => Type::FLOAT32,
-            ValueEnum::Float64(_) => Type::FLOAT64,
-            ValueEnum::Char(_) => Type::CHAR,
-            ValueEnum::String(_) => Type::STRING,
-            ValueEnum::List(inner) => Type(TypeEnum::List(inner.ty.clone())),
-            ValueEnum::Record(inner) => Type(TypeEnum::Record(inner.ty.clone())),
-            ValueEnum::Tuple(inner) => Type(TypeEnum::Tuple(inner.ty.clone())),
-            ValueEnum::Variant(inner) => Type(TypeEnum::Variant(inner.ty.clone())),
-            ValueEnum::Enum(inner) => Type(TypeEnum::Enum(inner.ty.clone())),
-            ValueEnum::Option(inner) => Type(TypeEnum::Option(inner.ty.clone())),
-            ValueEnum::Result(inner) => Type(TypeEnum::Result(inner.ty.clone())),
-            ValueEnum::Flags(inner) => Type(TypeEnum::Flags(inner.ty.clone())),
-        }
-    }
-
     fn kind(&self) -> WasmTypeKind {
         match &self.0 {
             ValueEnum::Bool(_) => WasmTypeKind::Bool,
@@ -261,10 +235,8 @@ impl WasmValue for Value {
             });
         }
         for (ty, val) in types.iter().zip(&elements) {
-            if &val.ty() != ty {
-                return Err(WasmValueError::wrong_value_type(&val.ty(), val));
-            }
-        }
+            check_type2(ty, val)?;
+        };
         let ty = maybe_unwrap_type!(&ty.0, TypeEnum::Tuple).unwrap().clone();
         Ok(Self(ValueEnum::Tuple(Tuple { ty, elements })))
     }
@@ -414,11 +386,65 @@ fn cow<T: ToOwned + ?Sized>(t: &T) -> Cow<T> {
 }
 
 fn check_type(expected: &Type, val: Value) -> Result<Value, WasmValueError> {
-    if &val.ty() == expected {
-        Ok(val)
-    } else {
-        Err(WasmValueError::wrong_value_type(expected, &val))
-    }
+    check_type2(expected, &val)?;
+    Ok(val)
+}
+
+fn check_type2(expected: &Type, val: &Value) -> Result<(), WasmValueError> {
+    use crate::value::{TypeEnum, ValueEnum};
+
+    let wrong_value_type = || -> Result<(), WasmValueError> {return Err(WasmValueError::wrong_value_type(expected, val))};
+
+    match (&val.0, expected) {
+        (ValueEnum::Bool(_), &Type::BOOL) => {},
+        (ValueEnum::S8(_), &Type::S8) => {},
+        (ValueEnum::S16(_), &Type::S16) => {},
+        (ValueEnum::S32(_), &Type::S32) => {},
+        (ValueEnum::S64(_), &Type::S64) => {},
+        (ValueEnum::U8(_), &Type::U8) => {},
+        (ValueEnum::U16(_), &Type::U16) => {},
+        (ValueEnum::U32(_), &Type::U32) => {},
+        (ValueEnum::U64(_), &Type::U64) => {},
+        (ValueEnum::Float32(_), &Type::FLOAT32) => {},
+        (ValueEnum::Float64(_), &Type::FLOAT64) => {},
+        (ValueEnum::Char(_), &Type::CHAR) => {},
+        (ValueEnum::String(_), &Type::STRING) => {},
+        (ValueEnum::List(list), _) => {
+            if let TypeEnum::List(list_type) = &expected.0 {
+                let ty = &list_type.element;
+                // TODO, okay that list.ty isn't used in the check?
+                for v in &list.elements {
+                    check_type2(ty, v)?;
+                }
+
+            } else {
+                return wrong_value_type();
+            }
+        },
+        (ValueEnum::Record(_inner), _) => {
+            // TODO
+        },
+        (ValueEnum::Tuple(_inner), _) => {
+            // TODO
+        },
+        (ValueEnum::Variant(_inner), _) => {
+            // TODO
+        },
+        (ValueEnum::Enum(_inner), _) => {
+            // TODO
+        },
+        (ValueEnum::Option(_inner), _) => {
+            // TODO
+        },
+        (ValueEnum::Result(_inner), _) => {
+            // TODO
+        },
+        (ValueEnum::Flags(_inner), _) => {
+            // TODO
+        },
+        (_, _) => return wrong_value_type(),
+    };
+    Ok(())
 }
 
 fn check_payload_type(
