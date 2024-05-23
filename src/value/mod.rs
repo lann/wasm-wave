@@ -464,8 +464,19 @@ fn check_type2(expected: &Type, val: &Value) -> Result<(), WasmValueError> {
         (ValueEnum::Result(_inner), _) => {
             // TODO
         }
-        (ValueEnum::Flags(_inner), _) => {
-            // TODO
+        (ValueEnum::Flags(flags), _) => {
+            if let TypeEnum::Flags(flags_type) = &expected.0 {
+                if flags.ty.as_ref() != flags_type.as_ref() {
+                    return wrong_value_type();
+                }
+                for flag in &flags.flags {
+                    if *flag >= flags.ty.as_ref().flags.len() {
+                        return wrong_value_type();
+                    }
+                }
+            } else {
+                return wrong_value_type();
+            }
         }
         (_, _) => return wrong_value_type(),
     };
