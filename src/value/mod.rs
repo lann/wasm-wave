@@ -436,9 +436,7 @@ fn check_type2(expected: &Type, val: &Value) -> Result<(), WasmValueError> {
                     return wrong_value_type();
                 }
 
-                for (ty, val) in
-                    expected_element_types.as_ref().iter().zip(&tuple.elements)
-                {
+                for (ty, val) in expected_element_types.as_ref().iter().zip(&tuple.elements) {
                     check_type2(ty, val)?;
                 }
             } else {
@@ -448,8 +446,17 @@ fn check_type2(expected: &Type, val: &Value) -> Result<(), WasmValueError> {
         (ValueEnum::Variant(_inner), _) => {
             // TODO
         }
-        (ValueEnum::Enum(_inner), _) => {
-            // TODO
+        (ValueEnum::Enum(enm), _) => {
+            if let TypeEnum::Enum(enum_type) = &expected.0 {
+                if enm.case >= enm.ty.cases.len() {
+                    return wrong_value_type();
+                }
+                if enm.ty.cases != enum_type.cases {
+                    return wrong_value_type();
+                }
+            } else {
+                return wrong_value_type();
+            }
         }
         (ValueEnum::Option(_inner), _) => {
             // TODO
