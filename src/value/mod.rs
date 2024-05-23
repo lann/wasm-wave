@@ -484,8 +484,26 @@ fn check_type2(expected: &Type, val: &Value) -> Result<(), WasmValueError> {
                 return wrong_value_type();
             }
         }
-        (ValueEnum::Result(_inner), _) => {
-            // TODO
+        (ValueEnum::Result(result), _) => {
+            if let TypeEnum::Result(result_type) = &expected.0 {
+                if result.ty.as_ref() != result_type.as_ref() {
+                    return wrong_value_type();
+                }
+                match &result.value {
+                    Ok(o) => match (&o, &result_type.ok) {
+                        (None, None) => {}
+                        (Some(v), Some(t)) => check_type2(t, v)?,
+                        _ => return wrong_value_type(),
+                    },
+                    Err(e) => match (&e, &result_type.err) {
+                        (None, None) => {}
+                        (Some(v), Some(t)) => check_type2(t, v)?,
+                        _ => return wrong_value_type(),
+                    },
+                }
+            } else {
+                return wrong_value_type();
+            }
         }
         (ValueEnum::Flags(flags), _) => {
             if let TypeEnum::Flags(flags_type) = &expected.0 {
