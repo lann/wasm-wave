@@ -412,7 +412,10 @@ fn check_type2(expected: &Type, val: &Value) -> Result<(), WasmValueError> {
         (ValueEnum::List(list), _) => {
             if let TypeEnum::List(list_type) = &expected.0 {
                 let ty = &list_type.element;
-                // TODO, okay that list.ty isn't used in the check?
+                let ty2 = &list.ty.element;
+                if ty != ty2 {
+                    return wrong_value_type();
+                }
                 for v in &list.elements {
                     check_type2(ty, v)?;
                 }
