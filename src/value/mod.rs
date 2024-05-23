@@ -423,8 +423,25 @@ fn check_type2(expected: &Type, val: &Value) -> Result<(), WasmValueError> {
                 return wrong_value_type();
             }
         }
-        (ValueEnum::Record(_inner), _) => {
-            // TODO
+        (ValueEnum::Record(record), _) => {
+            if let TypeEnum::Record(record_type) = &expected.0 {
+                if record.ty.as_ref() != record_type.as_ref() {
+                    return wrong_value_type();
+                }
+                let expected_element_types = &record_type.fields;
+                if expected_element_types != &record.ty.fields {
+                    return wrong_value_type();
+                }
+                if expected_element_types.len() != record.fields.len() {
+                    return wrong_value_type();
+                }
+
+                for (field_ty, val) in expected_element_types.as_ref().iter().zip(&record.fields) {
+                    check_type2(&field_ty.1, val)?;
+                }
+            } else {
+                return wrong_value_type();
+            }
         }
         (ValueEnum::Tuple(tuple), _) => {
             if let TypeEnum::Tuple(tuple_type) = &expected.0 {
