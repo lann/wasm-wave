@@ -236,7 +236,7 @@ impl WasmValue for Value {
         }
         for (ty, val) in types.iter().zip(&elements) {
             check_type2(ty, val)?;
-        };
+        }
         let ty = maybe_unwrap_type!(&ty.0, TypeEnum::Tuple).unwrap().clone();
         Ok(Self(ValueEnum::Tuple(Tuple { ty, elements })))
     }
@@ -393,58 +393,73 @@ fn check_type(expected: &Type, val: Value) -> Result<Value, WasmValueError> {
 fn check_type2(expected: &Type, val: &Value) -> Result<(), WasmValueError> {
     use crate::value::{TypeEnum, ValueEnum};
 
-    let wrong_value_type = || -> Result<(), WasmValueError> {Err(WasmValueError::wrong_value_type(expected, val))};
+    let wrong_value_type =
+        || -> Result<(), WasmValueError> { Err(WasmValueError::wrong_value_type(expected, val)) };
 
     match (&val.0, expected) {
-        (ValueEnum::Bool(_), &Type::BOOL) => {},
-        (ValueEnum::S8(_), &Type::S8) => {},
-        (ValueEnum::S16(_), &Type::S16) => {},
-        (ValueEnum::S32(_), &Type::S32) => {},
-        (ValueEnum::S64(_), &Type::S64) => {},
-        (ValueEnum::U8(_), &Type::U8) => {},
-        (ValueEnum::U16(_), &Type::U16) => {},
-        (ValueEnum::U32(_), &Type::U32) => {},
-        (ValueEnum::U64(_), &Type::U64) => {},
-        (ValueEnum::Float32(_), &Type::FLOAT32) => {},
-        (ValueEnum::Float64(_), &Type::FLOAT64) => {},
-        (ValueEnum::Char(_), &Type::CHAR) => {},
-        (ValueEnum::String(_), &Type::STRING) => {},
+        (ValueEnum::Bool(_), &Type::BOOL) => {}
+        (ValueEnum::S8(_), &Type::S8) => {}
+        (ValueEnum::S16(_), &Type::S16) => {}
+        (ValueEnum::S32(_), &Type::S32) => {}
+        (ValueEnum::S64(_), &Type::S64) => {}
+        (ValueEnum::U8(_), &Type::U8) => {}
+        (ValueEnum::U16(_), &Type::U16) => {}
+        (ValueEnum::U32(_), &Type::U32) => {}
+        (ValueEnum::U64(_), &Type::U64) => {}
+        (ValueEnum::Float32(_), &Type::FLOAT32) => {}
+        (ValueEnum::Float64(_), &Type::FLOAT64) => {}
+        (ValueEnum::Char(_), &Type::CHAR) => {}
+        (ValueEnum::String(_), &Type::STRING) => {}
         (ValueEnum::List(list), _) => {
             if let TypeEnum::List(list_type) = &expected.0 {
                 let ty = &list_type.element;
-                let ty2 = &list.ty.element;
-                if ty != ty2 {
+                if ty != &list.ty.element {
                     return wrong_value_type();
                 }
                 for v in &list.elements {
                     check_type2(ty, v)?;
                 }
-
             } else {
                 return wrong_value_type();
             }
-        },
+        }
         (ValueEnum::Record(_inner), _) => {
             // TODO
-        },
-        (ValueEnum::Tuple(_inner), _) => {
-            // TODO
-        },
+        }
+        (ValueEnum::Tuple(tuple), _) => {
+            if let TypeEnum::Tuple(tuple_type) = &expected.0 {
+                let expected_element_types = &tuple_type.elements;
+                if expected_element_types != &tuple.ty.elements {
+                    return wrong_value_type();
+                }
+                if expected_element_types.len() != tuple.elements.len() {
+                    return wrong_value_type();
+                }
+
+                for (ty, val) in
+                    expected_element_types.as_ref().iter().zip(&tuple.elements)
+                {
+                    check_type2(ty, val)?;
+                }
+            } else {
+                return wrong_value_type();
+            }
+        }
         (ValueEnum::Variant(_inner), _) => {
             // TODO
-        },
+        }
         (ValueEnum::Enum(_inner), _) => {
             // TODO
-        },
+        }
         (ValueEnum::Option(_inner), _) => {
             // TODO
-        },
+        }
         (ValueEnum::Result(_inner), _) => {
             // TODO
-        },
+        }
         (ValueEnum::Flags(_inner), _) => {
             // TODO
-        },
+        }
         (_, _) => return wrong_value_type(),
     };
     Ok(())
