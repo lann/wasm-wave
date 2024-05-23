@@ -472,8 +472,17 @@ fn check_type2(expected: &Type, val: &Value) -> Result<(), WasmValueError> {
                 return wrong_value_type();
             }
         }
-        (ValueEnum::Option(_inner), _) => {
-            // TODO
+        (ValueEnum::Option(option), _) => {
+            if let TypeEnum::Option(option_type) = &expected.0 {
+                if option.ty.as_ref().some != option_type.some {
+                    return wrong_value_type();
+                }
+                if let Some(v) = option.value.as_ref() {
+                    check_type2(&option_type.some, v)?;
+                }
+            } else {
+                return wrong_value_type();
+            }
         }
         (ValueEnum::Result(_inner), _) => {
             // TODO
