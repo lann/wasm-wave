@@ -443,8 +443,22 @@ fn check_type2(expected: &Type, val: &Value) -> Result<(), WasmValueError> {
                 return wrong_value_type();
             }
         }
-        (ValueEnum::Variant(_inner), _) => {
-            // TODO
+        (ValueEnum::Variant(variant), _) => {
+            if let TypeEnum::Variant(variant_type) = &expected.0 {
+                if variant.ty.cases != variant_type.cases {
+                    return wrong_value_type();
+                }
+                if variant.case >= variant.ty.cases.len() {
+                    return wrong_value_type();
+                }
+                match (&variant.ty.cases[variant.case].1, &variant.payload) {
+                    (None, None) => {}
+                    (Some(t), Some(v)) => check_type2(t, v)?,
+                    _ => return wrong_value_type(),
+                }
+            } else {
+                return wrong_value_type();
+            }
         }
         (ValueEnum::Enum(enm), _) => {
             if let TypeEnum::Enum(enum_type) = &expected.0 {
