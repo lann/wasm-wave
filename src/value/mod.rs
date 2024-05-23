@@ -393,7 +393,7 @@ fn check_type(expected: &Type, val: Value) -> Result<Value, WasmValueError> {
 fn check_type2(expected: &Type, val: &Value) -> Result<(), WasmValueError> {
     use crate::value::{TypeEnum, ValueEnum};
 
-    let wrong_value_type = || -> Result<(), WasmValueError> {return Err(WasmValueError::wrong_value_type(expected, val))};
+    let wrong_value_type = || -> Result<(), WasmValueError> {Err(WasmValueError::wrong_value_type(expected, val))};
 
     match (&val.0, expected) {
         (ValueEnum::Bool(_), &Type::BOOL) => {},
