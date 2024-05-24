@@ -448,11 +448,42 @@ impl Display for ParserErrorKind {
 
 #[cfg(test)]
 mod tests {
+    use wasmtime::component;
+
     use crate::value::{Type, Value};
     use crate::{canonicalize_nan32, canonicalize_nan64};
 
     use super::*;
 
+    fn local_ty(val: &component::Val) -> component::Type {
+        match val {
+            component::Val::Bool(_) => component::Type::Bool,
+            component::Val::S8(_) => component::Type::S8,
+            component::Val::U8(_) => component::Type::U8,
+            component::Val::S16(_) => component::Type::S16,
+            component::Val::U16(_) => component::Type::U16,
+            component::Val::S32(_) => component::Type::S32,
+            component::Val::U32(_) => component::Type::U32,
+            component::Val::S64(_) => component::Type::S64,
+            component::Val::U64(_) => component::Type::U64,
+            component::Val::Float32(_) => component::Type::Float32,
+            component::Val::Float64(_) => component::Type::Float64,
+            component::Val::Char(_) => component::Type::Char,
+            component::Val::String(_) => component::Type::String,
+            _ => unimplemented!(),
+            /*
+            component::Val::List(_) => component::Type::List ...,
+            component::Val::Record(_) => component::Type::Record ...,
+            component::Val::Tuple(_) => component::Type::Tuple ...,
+            component::Val::Variant(_, _) => component::Type::Variant ...,
+            component::Val::Enum(_) => component::Type::Enum ...,
+            component::Val::Option(_) => component::Type::Option ...,
+            component::Val::Result(_) => component::Type::Result ...,
+            component::Val::Flags(_) => component::Type::Flags ...,
+            component::Val::Resource(_) => todo!(),
+             */
+        }
+    }
     #[test]
     fn component_vals_smoke_test() {
         use wasmtime::component::Val;
@@ -489,7 +520,7 @@ mod tests {
             (r#""☃\\\"\n""#, Val::String("☃\\\"\n".into())),
             (r#""\u{0}\u{7f}""#, Val::String("\x00\x7F".into())),
         ] {
-            assert_eq!(parse_unwrap::<Val>(input, want.ty()), want);
+            assert_eq!(parse_unwrap::<Val>(input, local_ty(&want)), want);
         }
     }
 

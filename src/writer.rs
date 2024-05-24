@@ -6,7 +6,7 @@ use thiserror::Error;
 
 use crate::{
     lex::Keyword,
-    wasm::{WasmType, WasmTypeKind, WasmValue},
+    wasm::{WasmTypeKind, WasmValue},
 };
 
 /// A Web Assembly Value Encoding writer.
@@ -27,8 +27,7 @@ impl<W: Write> Writer<W> {
     where
         V: WasmValue,
     {
-        let ty = val.ty();
-        match ty.kind() {
+        match val.kind() {
             WasmTypeKind::Bool => self.write_str(if val.unwrap_bool() { "true" } else { "false" }),
             WasmTypeKind::S8 => self.write_display(val.unwrap_s8()),
             WasmTypeKind::S16 => self.write_display(val.unwrap_s16()),
@@ -80,8 +79,7 @@ impl<W: Write> Writer<W> {
                 self.write_str("{")?;
                 let mut first = true;
                 for (name, val) in val.unwrap_record() {
-                    if !matches!(val.ty().kind(), WasmTypeKind::Option)
-                        || val.unwrap_option().is_some()
+                    if !matches!(val.kind(), WasmTypeKind::Option) || val.unwrap_option().is_some()
                     {
                         if first {
                             first = false;

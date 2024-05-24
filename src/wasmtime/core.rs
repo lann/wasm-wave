@@ -15,13 +15,14 @@ impl WasmType for wasmtime::ValType {
             Self::F64 => WasmTypeKind::Float64,
             Self::V128 => WasmTypeKind::Tuple,
 
-            Self::FuncRef | Self::ExternRef => WasmTypeKind::Unsupported,
+            Self::Ref(_) => WasmTypeKind::Unsupported,
         }
     }
 
     fn tuple_element_types(&self) -> Box<dyn Iterator<Item = Self> + '_> {
-        if *self != Self::V128 {
-            panic!("tuple_element_types called on non-tuple type");
+        match *self {
+            Self::V128 => {}
+            _ => panic!("tuple_element_types called on non-tuple type"),
         }
         Box::new([Self::I64, Self::I64].into_iter())
     }
@@ -30,8 +31,17 @@ impl WasmType for wasmtime::ValType {
 impl WasmValue for wasmtime::Val {
     type Type = wasmtime::ValType;
 
-    fn ty(&self) -> Self::Type {
-        self.ty()
+    fn kind(&self) -> WasmTypeKind {
+        match self {
+            Self::I32(_) => WasmTypeKind::S32,
+            Self::I64(_) => WasmTypeKind::S64,
+            Self::F32(_) => WasmTypeKind::Float32,
+            Self::F64(_) => WasmTypeKind::Float64,
+            Self::V128(_) => WasmTypeKind::Tuple,
+            Self::FuncRef(_) => WasmTypeKind::Unsupported,
+            Self::ExternRef(_) => WasmTypeKind::Unsupported,
+            Self::AnyRef(_) => WasmTypeKind::Unsupported,
+        }
     }
 
     fn make_s32(val: i32) -> Self {
@@ -52,8 +62,9 @@ impl WasmValue for wasmtime::Val {
         ty: &Self::Type,
         vals: impl IntoIterator<Item = Self>,
     ) -> Result<Self, WasmValueError> {
-        if *ty != Self::Type::V128 {
-            return Err(WasmValueError::other("tuples only used for v128 (v64x2)"));
+        match *ty {
+            Self::Type::V128 => {}
+            _ => return Err(WasmValueError::other("tuples only used for v128 (v64x2)")),
         }
         let [l_val, h_val]: [Self; 2] = vals
             .into_iter()

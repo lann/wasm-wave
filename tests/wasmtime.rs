@@ -91,7 +91,7 @@ fn test_wasmtime_component_func_type() {
     let linker = Linker::<()>::new(&engine);
     let component_type = linker.substituted_component_type(&component).unwrap();
     let func_item = component_type
-        .get_export("func-type")
+        .get_export(&engine, "func-type")
         .expect("missing export");
     let ComponentItem::ComponentFunc(func_type) = func_item else {
         panic!("incorrect item type {func_item:?}");

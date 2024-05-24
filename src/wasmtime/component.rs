@@ -5,8 +5,8 @@ use wasmtime::component;
 use crate::{
     canonicalize_nan32, canonicalize_nan64,
     wasm::{
-        ensure_type_kind, maybe_unwrap_type, unwrap_val, DisplayFunc, WasmFunc, WasmType,
-        WasmTypeKind, WasmValueError,
+        ensure_type_kind, maybe_unwrap_type, unwrap_2val, unwrap_val, DisplayFunc, DisplayValue,
+        WasmFunc, WasmType, WasmTypeKind, WasmValueError,
     },
     WasmValue,
 };
@@ -106,8 +106,31 @@ macro_rules! impl_primitives {
 impl WasmValue for component::Val {
     type Type = component::Type;
 
-    fn ty(&self) -> Self::Type {
-        self.ty()
+    fn kind(&self) -> WasmTypeKind {
+        match self {
+            Self::Bool(_) => WasmTypeKind::Bool,
+            Self::S8(_) => WasmTypeKind::S8,
+            Self::U8(_) => WasmTypeKind::U8,
+            Self::S16(_) => WasmTypeKind::S16,
+            Self::U16(_) => WasmTypeKind::U16,
+            Self::S32(_) => WasmTypeKind::S32,
+            Self::U32(_) => WasmTypeKind::U32,
+            Self::S64(_) => WasmTypeKind::S64,
+            Self::U64(_) => WasmTypeKind::U64,
+            Self::Float32(_) => WasmTypeKind::Float32,
+            Self::Float64(_) => WasmTypeKind::Float64,
+            Self::Char(_) => WasmTypeKind::Char,
+            Self::String(_) => WasmTypeKind::String,
+            Self::List(_) => WasmTypeKind::List,
+            Self::Record(_) => WasmTypeKind::Record,
+            Self::Tuple(_) => WasmTypeKind::Tuple,
+            Self::Variant(..) => WasmTypeKind::Variant,
+            Self::Enum(_) => WasmTypeKind::Enum,
+            Self::Option(_) => WasmTypeKind::Option,
+            Self::Result(_) => WasmTypeKind::Result,
+            Self::Flags(_) => WasmTypeKind::Flags,
+            Self::Resource(_) => WasmTypeKind::Unsupported,
+        }
     }
 
     impl_primitives!(
@@ -140,60 +163,74 @@ impl WasmValue for component::Val {
         vals: impl IntoIterator<Item = Self>,
     ) -> Result<Self, WasmValueError> {
         ensure_type_kind(ty, WasmTypeKind::List)?;
-        ty.unwrap_list()
-            .new_val(vals.into_iter().collect())
-            .map_err(WasmValueError::other)
+        let val = Self::List(vals.into_iter().collect());
+        ensure_type_val(ty, &val)?;
+        Ok(val)
     }
     fn make_record<'a>(
         ty: &Self::Type,
         fields: impl IntoIterator<Item = (&'a str, Self)>,
     ) -> Result<Self, WasmValueError> {
-        ty.unwrap_record()
-            .new_val(fields)
-            .map_err(WasmValueError::other)
+        ensure_type_kind(ty, WasmTypeKind::Record)?;
+        let values: Vec<(String, Self)> = fields
+            .into_iter()
+            .map(|(name, val)| (name.to_string(), val))
+            .collect();
+        let val = Self::Record(values);
+        ensure_type_val(ty, &val)?;
+        Ok(val)
     }
     fn make_tuple(
         ty: &Self::Type,
         vals: impl IntoIterator<Item = Self>,
     ) -> Result<Self, WasmValueError> {
-        ty.unwrap_tuple()
-            .new_val(vals.into_iter().collect())
-            .map_err(WasmValueError::other)
+        ensure_type_kind(ty, WasmTypeKind::Tuple)?;
+        let val = Self::Tuple(vals.into_iter().collect());
+        ensure_type_val(ty, &val)?;
+        Ok(val)
     }
     fn make_variant(
         ty: &Self::Type,
         case: &str,
         val: Option<Self>,
     ) -> Result<Self, WasmValueError> {
-        ty.unwrap_variant()
-            .new_val(case, val)
-            .map_err(WasmValueError::other)
+        ensure_type_kind(ty, WasmTypeKind::Variant)?;
+        let val = Self::Variant(case.to_string(), val.map(Box::new));
+        ensure_type_val(ty, &val)?;
+        Ok(val)
     }
     fn make_enum(ty: &Self::Type, case: &str) -> Result<Self, WasmValueError> {
-        ty.unwrap_enum()
-            .new_val(case)
-            .map_err(WasmValueError::other)
+        ensure_type_kind(ty, WasmTypeKind::Enum)?;
+        let val = Self::Enum(case.to_string());
+        ensure_type_val(ty, &val)?;
+        Ok(val)
     }
     fn make_option(ty: &Self::Type, val: Option<Self>) -> Result<Self, WasmValueError> {
-        ty.unwrap_option()
-            .new_val(val)
-            .map_err(WasmValueError::other)
+        ensure_type_kind(ty, WasmTypeKind::Option)?;
+        let val = Self::Option(val.map(Box::new));
+        ensure_type_val(ty, &val)?;
+        Ok(val)
     }
     fn make_result(
         ty: &Self::Type,
         val: Result<Option<Self>, Option<Self>>,
     ) -> Result<Self, WasmValueError> {
-        ty.unwrap_result()
-            .new_val(val)
-            .map_err(WasmValueError::other)
+        ensure_type_kind(ty, WasmTypeKind::Result)?;
+        let val = match val {
+            Ok(val) => Self::Result(Ok(val.map(Box::new))),
+            Err(val) => Self::Result(Err(val.map(Box::new))),
+        };
+        ensure_type_val(ty, &val)?;
+        Ok(val)
     }
     fn make_flags<'a>(
         ty: &Self::Type,
         names: impl IntoIterator<Item = &'a str>,
     ) -> Result<Self, WasmValueError> {
-        ty.unwrap_flags()
-            .new_val(&names.into_iter().collect::<Vec<_>>())
-            .map_err(WasmValueError::other)
+        ensure_type_kind(ty, WasmTypeKind::Flags)?;
+        let val = Self::Flags(names.into_iter().map(|n| n.to_string()).collect());
+        ensure_type_val(ty, &val)?;
+        Ok(val)
     }
 
     fn unwrap_float32(&self) -> f32 {
@@ -205,7 +242,7 @@ impl WasmValue for component::Val {
         canonicalize_nan64(val)
     }
     fn unwrap_string(&self) -> Cow<str> {
-        unwrap_val!(self, Self::String, "string").as_ref().into()
+        unwrap_val!(self, Self::String, "string").into()
     }
     fn unwrap_list(&self) -> Box<dyn Iterator<Item = Cow<Self>> + '_> {
         let list = unwrap_val!(self, Self::List, "list");
@@ -213,32 +250,137 @@ impl WasmValue for component::Val {
     }
     fn unwrap_record(&self) -> Box<dyn Iterator<Item = (Cow<str>, Cow<Self>)> + '_> {
         let record = unwrap_val!(self, Self::Record, "record");
-        Box::new(record.fields().map(|(name, val)| (name.into(), cow(val))))
+        Box::new(record.iter().map(|(name, val)| (name.into(), cow(val))))
     }
     fn unwrap_tuple(&self) -> Box<dyn Iterator<Item = Cow<Self>> + '_> {
         let tuple = unwrap_val!(self, Self::Tuple, "tuple");
-        Box::new(tuple.values().iter().map(cow))
+        Box::new(tuple.iter().map(cow))
     }
     fn unwrap_variant(&self) -> (Cow<str>, Option<Cow<Self>>) {
-        let variant = unwrap_val!(self, Self::Variant, "variant");
-        (variant.discriminant().into(), variant.payload().map(cow))
+        let (discriminant, payload) = unwrap_2val!(self, Self::Variant, "variant");
+        (discriminant.into(), payload.as_deref().map(cow))
     }
     fn unwrap_enum(&self) -> Cow<str> {
-        unwrap_val!(self, Self::Enum, "enum").discriminant().into()
+        unwrap_val!(self, Self::Enum, "enum").into()
     }
     fn unwrap_option(&self) -> Option<Cow<Self>> {
-        unwrap_val!(self, Self::Option, "option").value().map(cow)
+        unwrap_val!(self, Self::Option, "option")
+            .as_deref()
+            .map(cow)
     }
     fn unwrap_result(&self) -> Result<Option<Cow<Self>>, Option<Cow<Self>>> {
-        match unwrap_val!(self, Self::Result, "result").value() {
-            Ok(val) => Ok(val.map(cow)),
-            Err(val) => Err(val.map(cow)),
+        match unwrap_val!(self, Self::Result, "result") {
+            Ok(t) => Ok(t.as_deref().map(cow)),
+            Err(e) => Err(e.as_deref().map(cow)),
         }
     }
     fn unwrap_flags(&self) -> Box<dyn Iterator<Item = Cow<str>> + '_> {
         let flags = unwrap_val!(self, Self::Flags, "flags");
-        Box::new(flags.flags().map(Into::into))
+        Box::new(flags.iter().map(Into::into))
     }
+}
+
+// Returns an error if the given component::Val is not of the given component::Type.
+//
+// The component::Val::Resource(_) variant results in an unsupported error at this time.
+fn ensure_type_val(ty: &component::Type, val: &component::Val) -> Result<(), WasmValueError> {
+    let wrong_value_type =
+        || -> Result<(), WasmValueError> { Err(WasmValueError::wrong_value_type(ty, val)) };
+
+    if ty.kind() != val.kind() {
+        return wrong_value_type();
+    }
+
+    match val {
+        component::Val::List(vals) => {
+            let list_type = ty.unwrap_list().ty();
+            for val in vals {
+                ensure_type_val(&list_type, val)?;
+            }
+        }
+        component::Val::Record(vals) => {
+            let record_handle = ty.unwrap_record();
+            // Check that every non option field type is found in the Vec
+            for field in record_handle.fields() {
+                if !matches!(field.ty, component::Type::Option(_))
+                    && !vals.iter().any(|(n, _)| n == field.name)
+                {
+                    return wrong_value_type();
+                }
+            }
+            // Check that every (String, Val) of the given Vec is a correct field_type
+            for (name, field_val) in vals.iter() {
+                // N.B. The `fields` call in each iteration is non-trivial, perhaps a cleaner way
+                // using the loop above will present itself.
+                if let Some(field) = record_handle.fields().find(|field| field.name == name) {
+                    ensure_type_val(&field.ty, field_val)?;
+                } else {
+                    return wrong_value_type();
+                }
+            }
+        }
+        component::Val::Tuple(vals) => {
+            let field_types = ty.unwrap_tuple().types();
+            if field_types.len() != vals.len() {
+                return wrong_value_type();
+            }
+            for (ty, val) in field_types.into_iter().zip(vals.iter()) {
+                ensure_type_val(&ty, val)?;
+            }
+        }
+        component::Val::Variant(name, optional_payload) => {
+            if let Some(case) = ty.unwrap_variant().cases().find(|case| case.name == name) {
+                match (optional_payload, case.ty) {
+                    (None, None) => {}
+                    (Some(payload), Some(payload_ty)) => ensure_type_val(&payload_ty, payload)?,
+                    _ => return wrong_value_type(),
+                }
+            } else {
+                return wrong_value_type();
+            }
+        }
+        component::Val::Enum(name) => {
+            if !ty.unwrap_enum().names().any(|n| n == name) {
+                return wrong_value_type();
+            }
+        }
+        component::Val::Option(Some(some_val)) => {
+            ensure_type_val(&ty.unwrap_option().ty(), some_val.as_ref())?;
+        }
+        component::Val::Result(res_val) => {
+            let result_handle = ty.unwrap_result();
+            match res_val {
+                Ok(ok) => match (ok, result_handle.ok()) {
+                    (None, None) => {}
+                    (Some(ok_val), Some(ok_ty)) => ensure_type_val(&ok_ty, ok_val.as_ref())?,
+                    _ => return wrong_value_type(),
+                },
+                Err(err) => match (err, result_handle.err()) {
+                    (None, None) => {}
+                    (Some(err_val), Some(err_ty)) => ensure_type_val(&err_ty, err_val.as_ref())?,
+                    _ => return wrong_value_type(),
+                },
+            }
+        }
+        component::Val::Flags(flags) => {
+            let flags_handle = ty.unwrap_flags();
+            for flag in flags {
+                if !flags_handle.names().any(|n| n == flag) {
+                    return wrong_value_type();
+                }
+            }
+        }
+        component::Val::Resource(_) => {
+            return Err(WasmValueError::UnsupportedType(
+                DisplayValue(val).to_string(),
+            ))
+        }
+
+        // Any leaf variant type has already had its kind compared above; nothing further to check.
+        // Likewise, the component::Option(None) arm would have nothing left to check.
+        _ => {}
+    }
+    Ok(())
 }
 
 impl WasmFunc for component::types::ComponentFunc {
