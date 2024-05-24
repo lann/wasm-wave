@@ -1,6 +1,6 @@
 [package]
 name = "wasm-wave"
-version = "0.5.1"
+version = "0.6.0"
 authors = ["lann.martin@fermyon.com"]
 description = "Web Assembly Value Encoding"
 license = "Apache-2.0"
