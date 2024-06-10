@@ -21,19 +21,19 @@ pub(super) enum TypeEnum {
 
 #[allow(missing_docs)]
 impl Type {
-    pub const BOOL: Self = Self::must_simple(WasmTypeKind::Bool);
-    pub const S8: Self = Self::must_simple(WasmTypeKind::S8);
-    pub const S16: Self = Self::must_simple(WasmTypeKind::S16);
-    pub const S32: Self = Self::must_simple(WasmTypeKind::S32);
-    pub const S64: Self = Self::must_simple(WasmTypeKind::S64);
-    pub const U8: Self = Self::must_simple(WasmTypeKind::U8);
-    pub const U16: Self = Self::must_simple(WasmTypeKind::U16);
-    pub const U32: Self = Self::must_simple(WasmTypeKind::U32);
-    pub const U64: Self = Self::must_simple(WasmTypeKind::U64);
-    pub const FLOAT32: Self = Self::must_simple(WasmTypeKind::Float32);
-    pub const FLOAT64: Self = Self::must_simple(WasmTypeKind::Float64);
-    pub const CHAR: Self = Self::must_simple(WasmTypeKind::Char);
-    pub const STRING: Self = Self::must_simple(WasmTypeKind::String);
+    pub const BOOL: Self = Self(TypeEnum::Simple(SimpleType(WasmTypeKind::Bool)));
+    pub const S8: Self = Self(TypeEnum::Simple(SimpleType(WasmTypeKind::S8)));
+    pub const S16: Self = Self(TypeEnum::Simple(SimpleType(WasmTypeKind::S16)));
+    pub const S32: Self = Self(TypeEnum::Simple(SimpleType(WasmTypeKind::S32)));
+    pub const S64: Self = Self(TypeEnum::Simple(SimpleType(WasmTypeKind::S64)));
+    pub const U8: Self = Self(TypeEnum::Simple(SimpleType(WasmTypeKind::U8)));
+    pub const U16: Self = Self(TypeEnum::Simple(SimpleType(WasmTypeKind::U16)));
+    pub const U32: Self = Self(TypeEnum::Simple(SimpleType(WasmTypeKind::U32)));
+    pub const U64: Self = Self(TypeEnum::Simple(SimpleType(WasmTypeKind::U64)));
+    pub const FLOAT32: Self = Self(TypeEnum::Simple(SimpleType(WasmTypeKind::Float32)));
+    pub const FLOAT64: Self = Self(TypeEnum::Simple(SimpleType(WasmTypeKind::Float64)));
+    pub const CHAR: Self = Self(TypeEnum::Simple(SimpleType(WasmTypeKind::Char)));
+    pub const STRING: Self = Self(TypeEnum::Simple(SimpleType(WasmTypeKind::String)));
 
     /// Returns the simple type of the given `kind`. Returns None if the kind
     /// represents a parameterized type.
