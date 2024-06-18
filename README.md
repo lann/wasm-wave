@@ -1,3 +1,7 @@
+| ⚠️ Migrated to https://github.com/bytecodealliance/wasm-tools/tree/main/crates/wasm-wave ⚠️ |
+|--|
+
+
 # WAVE: Web Assembly Value Encoding
 
 WAVE is a human-oriented text encoding of WebAssembly Component Model values. It is designed to be consistent with the
